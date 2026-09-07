@@ -1,7 +1,5 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.Region;
-
 import javafx.scene.paint.Color;
 
 import java.util.function.Consumer;

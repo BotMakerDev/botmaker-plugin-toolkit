@@ -1,6 +1,5 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.Region;
 import com.botmaker.plugin.api.ValueContext;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;

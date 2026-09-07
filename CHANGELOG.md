@@ -5,6 +5,14 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`Region`**, moved here from `com.botmaker.plugin.api.Region` unchanged. `ScreenPicks` is the only thing
+  that produces one and `Editors` the only thing that consumes one, so it is this module's type. Update the
+  import; nothing else changes.
+
 ## [0.0.5] — 2026-09-05
 
 ### Fixed
