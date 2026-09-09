@@ -18,6 +18,50 @@ reason there are two modules:
 A plugin takes a new toolkit without taking a new contract. That is the property to protect; if a change
 here would force the contract to move with it, the change is in the wrong module.
 
+## Two halves, since 2026-09-09 — and the second one is not a widget kit
+
+The one-line description above is now incomplete, and the module is best read as two packages with two
+audiences:
+
+| | audience | may name | dependencies it uses |
+|---|---|---|---|
+| everything except `config` | a plugin's **editor** half, running inside a host | `ValueContext`, `javafx.scene.Node`, `Source` | contract and JavaFX, both `provided` — the host supplies them |
+| `com.botmaker.plugin.toolkit.config` | a **running bot**, which is not a host at all | jackson, and the JDK | `jackson-databind`, `compile` |
+
+`Settings`, `ProjectValues` and `ValueGrammar` are how a bot reads its own parameters, and they are here
+because **this is the only artifact that reaches a bot**. Walk it: a bot's classpath does not have
+`botmaker-studio-api`, since a plugin declares the contract `provided` on purpose, so the contract cannot
+hold them; the SDK holding them is what made reading a value a privilege of plugin #1, which is the whole
+thing being undone; and the toolkit is what a plugin declares at `compile` scope, so it travels with that
+plugin onto the classpath of every bot that uses it.
+
+They spent two days in `botmaker-shared` (2026-09-07 to 2026-09-09). That worked and was wrong for a reason
+worth keeping: a plugin shipping nothing but a value type and its grammar had to depend on shared — JNA,
+`jna-platform`, OpenCV and dadb — to reach a four-method interface. **There is no link between reading a
+parameter and matching an image.** shared stays what it is, the host platform layer, and a plugin that wants
+to enumerate windows still depends on it directly.
+
+**Three rules follow, and they are the ones to enforce on any change under `config`.**
+
+1. **Nothing in `config` may name a `com.botmaker.plugin.api` or a `javafx` type.** `ToolkitConfigIsBotSafeTest`
+   scans the source, not the classpath, because both are `provided` and therefore *present here* — the
+   failure would appear only in a stranger's bot, as a `NoClassDefFoundError` at the first settings read.
+   That is the same shape as the three `optional`-means-not-transitive bugs this project has shipped.
+2. **A dependency `config` needs is `compile`, never `optional`.** `optional` means not transitive: it would
+   be on this module's own classpath and absent from every consumer's, so every test here would pass and
+   every bot would fail.
+3. **This module ships no grammar.** The mechanism is the platform's; a vocabulary belongs to whoever
+   introduced it. "The obvious JDK ones" here would be a second `Duration` parser beside the SDK's, and
+   would make the toolkit a vocabulary — the one thing the platform's own test refuses. The nine JDK value
+   types are the SDK's today only because the SDK is the only plugin; they belong in a plugin of their own,
+   and `ValueGrammar` is what such a plugin would be written against.
+
+**And the rule this widening changed on the SDK's side**, recorded here because that is where it will be
+read: *only the SDK's plugin half (`plugin/`, `internal/plugin/`) may name the toolkit* is now *only its
+plugin half may name a toolkit **widget***. `internal/config/SdkGrammar` and `api/config/Settings` are
+library-half classes naming `toolkit.config`, and they are safe for exactly the reason above — that package
+links nothing a bot lacks.
+
 **It is the PLUGIN's dependency and never the host's — `botmaker-studio` must not list it.** That rule
 stood, was struck on 2026-08-28, and was restored on 2026-09-02. The round trip is worth carrying, because
 the argument that struck it is correct and will be made again.
