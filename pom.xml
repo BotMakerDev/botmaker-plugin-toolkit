@@ -41,7 +41,6 @@
         <javafx.version>25.0.4</javafx.version>
         <junit.version>5.10.2</junit.version>
         <javapoet.version>0.7.0</javapoet.version>
-        <jackson.version>2.17.0</jackson.version>
         <!-- The reactor/offline value. jitpack.yml injects the released tag from .deps.env at build time. -->
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
     </properties>
@@ -92,25 +91,18 @@
         </dependency>
 
         <!--
-          Jackson, the second dependency a plugin actually resolves, and it arrived with
-          `com.botmaker.plugin.toolkit.config` on 2026-09-09: ProjectValues reads a bot's own
-          activities.json, and something has to parse JSON.
+          There was a jackson-databind here for one day (2026-09-09), with `com.botmaker.plugin.toolkit.config`
+          — Settings, ProjectValues and ValueGrammar, how a running bot reads its own parameters. Both are
+          gone, to botmaker-plugin-basics, and JavaPoet is once again the only dependency a plugin resolves
+          through this module.
 
-          `compile`, never `optional`. An optional dependency is on this module's own classpath and absent
-          from every consumer's, so every test here would pass and a plugin resolving the toolkit would get
-          a ProjectValues that cannot load — the not-transitive failure this project has shipped three times
-          (the toolkit itself in 2026-08-28 and again 2026-09-04, JavaFX in a plugin constructor 2026-09-05).
-
-          2.17.0 to match botmaker-shared, the SDK and Studio, which all declare that version. It is the
-          version already on every bot's and every host's classpath, so this adds a jar to a plugin-only
-          classpath and nothing to the processes that matter most.
+          The placement was right that the toolkit reaches a bot and wrong about what follows from it. This
+          is a WIDGET KIT: it owns no value types, so holding the mechanism forced the rule "ship no grammar"
+          onto a module with nothing to ship, and it made a plugin that wanted to read one parameter resolve
+          a widget kit and a JSON parser to do it. plugin-basics is a plugin, owns the nine JDK value types,
+          and reaches a bot through the SDK's own compile-scope dependency on it. Do not bring either back:
+          a dependency here becomes every plugin's dependency, which is the bar this section states.
         -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

@@ -9,56 +9,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- **`com.botmaker.plugin.toolkit.config` — how a bot reads its own parameters, for every plugin rather than
-  for one.** Three classes:
-
-  ```java
-  Duration   wait   = Settings.load("wait", Duration.class);
-  int        health = Settings.load("minHealth", int.class);
-  List<Rect> zones  = Settings.loadAll("zones", Rect.class);
-  boolean    on     = Settings.enabled("Mining");
-  ```
-
-  `ProjectValues` is the untyped store over a bot's `activities.json` — a name in, stored text out, nothing
-  that knows what a value means. `ValueGrammar` is `Class<T> → parse/store/fallback`, found by
-  `ServiceLoader`. `Settings` resolves one against the other. **Ship a `ValueGrammar` beside any value type
-  you register**, and a bot can read your type by name exactly as it reads a `Duration`; the SDK's
-  `SdkGrammar` is the worked example.
-
-  **Why this module.** Of the five stages in a value's life, four were already plugin-general — declaring,
-  editing, writing and reading it in an *editor* are all contract types. The fifth, reading it in a **running
-  bot**, was `com.botmaker.sdk.api.config.Wire`, and was plugin #1's alone. It cannot live in the contract,
-  because a bot's classpath does not have the contract on it — a plugin declares `botmaker-studio-api`
-  `provided` on purpose. This module is what a plugin compiles against at `compile` scope, so it is the one
-  artifact that travels with a plugin all the way onto the classpath of the bots that use it.
-
-  It briefly lived in `botmaker-shared` (2026-09-07 to 2026-09-09). That worked and cost a plugin too much:
-  a plugin shipping nothing but a grammar had to take JNA, `jna-platform`, OpenCV and dadb to reach an
-  interface. There is no link between reading a parameter and matching an image.
-
-  **This module ships no grammar, and that is deliberate.** A vocabulary belongs to whoever introduced it.
-  "The obvious JDK ones" here would be a second `Duration` parser beside the SDK's — the drift the design
-  exists to prevent — and would make the toolkit a vocabulary, which is the one thing the platform's own test
-  refuses. Those nine types are the SDK's today only because the SDK is the only plugin.
-
-  Every read is total: an undeclared name, text that will not parse, a name declared as another type and a
-  missing file all answer the type's own fallback, so *enforce a default for every type* is a property of the
-  grammar rather than a rule to remember per call site. **One thing throws** — a type no grammar on the
-  classpath claims, which is a packaging mistake rather than a bad file and has no value to fall back to.
-  Two grammars claiming one type is refused by name rather than resolved by jar order.
-
 - **`Region`**, moved here from `com.botmaker.plugin.api.Region` unchanged. `ScreenPicks` is the only thing
   that produces one and `Editors` the only thing that consumes one, so it is this module's type. Update the
   import; nothing else changes.
 
 ### Changed
 
-- **This module is no longer editor-only, and its one dependency is now two.** `jackson-databind` 2.17.0 at
-  `compile` scope, because `ProjectValues` parses JSON — the same version `botmaker-shared`, the SDK and
-  Studio all declare, so it is already on every bot's and every host's classpath. Everything under
-  `com.botmaker.plugin.toolkit.config` runs in a **bot**, where neither the contract nor JavaFX exists;
-  everything else here is a widget and still assumes an editor. Nothing in `config` may name a
-  `com.botmaker.plugin.api` or a `javafx` type, and `ToolkitConfigIsBotSafeTest` holds that.
+- **This module is a widget kit and its one dependency is still JavaPoet.** For part of 2026-09-09 it was
+  not: `com.botmaker.plugin.toolkit.config` — `Settings`, `ProjectValues`, `ValueGrammar`, how a running bot
+  reads its own parameters — lived here with `jackson-databind` beside it, on the argument that a plugin
+  declares this module at `compile` scope and it is therefore the one artifact that travels all the way onto
+  a bot's classpath. Both moved to **`botmaker-plugin-basics`** the same evening, and nothing of that package
+  ever appeared in a release.
+
+  The reason is worth recording rather than quietly dropping. A widget kit **owns no value types**, so it
+  could hold that mechanism only under a standing promise never to use it — *ship no grammar here, or the
+  toolkit becomes a vocabulary* — and it made a plugin that wanted to read one parameter resolve a widget kit
+  and a JSON parser to do it. `botmaker-plugin-basics` is a plugin, owns the nine JDK value types, ships
+  `BasicsGrammar` for them like any plugin ships one for its own, and reaches a bot through the SDK's
+  ordinary `compile`-scope dependency on it. Nothing about how a bot reads a parameter changed; the package
+  a plugin imports it from did, before anybody could have imported it.
 
 ## [0.0.5] — 2026-09-05
 
