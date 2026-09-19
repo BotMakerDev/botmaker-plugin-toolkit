@@ -5,6 +5,39 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.1.3; re-released for updated upstream pins.
+
+No source changes since v0.1.2; re-released for updated upstream pins.
+
+No source changes since v0.1.1; re-released for updated upstream pins.
+
+No source changes since v0.1.0; re-released for updated upstream pins.
+
+### Added
+
+- **`Region`**, moved here from `com.botmaker.plugin.api.Region` unchanged. `ScreenPicks` is the only thing
+  that produces one and `Editors` the only thing that consumes one, so it is this module's type. Update the
+  import; nothing else changes.
+
+### Changed
+
+- **This module is a widget kit and its one dependency is still JavaPoet.** For part of 2026-09-09 it was
+  not: `com.botmaker.plugin.toolkit.config` — `Settings`, `ProjectValues`, `ValueGrammar`, how a running bot
+  reads its own parameters — lived here with `jackson-databind` beside it, on the argument that a plugin
+  declares this module at `compile` scope and it is therefore the one artifact that travels all the way onto
+  a bot's classpath. Both moved to **`botmaker-plugin-basics`** the same evening, and nothing of that package
+  ever appeared in a release.
+
+  The reason is worth recording rather than quietly dropping. A widget kit **owns no value types**, so it
+  could hold that mechanism only under a standing promise never to use it — *ship no grammar here, or the
+  toolkit becomes a vocabulary* — and it made a plugin that wanted to read one parameter resolve a widget kit
+  and a JSON parser to do it. `botmaker-plugin-basics` is a plugin, owns the nine JDK value types, ships
+  `BasicsGrammar` for them like any plugin ships one for its own, and reaches a bot through the SDK's
+  ordinary `compile`-scope dependency on it. Nothing about how a bot reads a parameter changed; the package
+  a plugin imports it from did, before anybody could have imported it.
+
 ## [0.1.3] — 2026-09-19
 
 No source changes since v0.1.2; re-released for updated upstream pins.
