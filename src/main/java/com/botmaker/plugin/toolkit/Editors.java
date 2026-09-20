@@ -68,92 +68,57 @@ public final class Editors {
     }
 
     /**
-     * A pill over {@code labels.length} whole numbers, edited in a dialog.
-     *
-     * <p>The shape of {@code Point}, {@code Size} and any other small tuple. The pill shows the numbers
-     * comma-separated; the dialog gives each one its own labelled field.
-     */
-    public static Node numbers(ValueContext ctx, String title, String... labels) {
-        int count = labels == null ? 0 : labels.length;
-        MenuButton pill = Pills.bare(numbersLabel(ctx, count, title));
-        Pills.onOpen(pill, () -> List.of(
-                Pills.item("Edit values…", () ->
-                        Modals.numbers(ctx, title, labels, Values.ints(ctx.value(), count), picked -> {
-                            ctx.set(Values.of(picked));
-                            pill.setText(numbersLabel(ctx, count, title));
-                        }))));
-        return pill;
-    }
-
-    /**
-     * A pill over a screen rectangle: <i>Select on screen…</i>, or the four numbers by hand.
-     *
-     * <p>The one editor that is worth having even if a plugin ships nothing else: dragging out a region is
-     * the pick every other one is a variation of. The overlay behind it is the plugin's own — see
-     * {@link ScreenPicks}.
-     */
-    public static Node region(ValueContext ctx) {
-        MenuButton pill = Pills.bare(regionLabel(ctx));
-        Pills.onOpen(pill, () -> List.of(
-                Pills.item("Select on screen…", () -> picks.region(r -> {
-                    ctx.set(Values.of(r.x(), r.y(), r.width(), r.height()));
-                    pill.setText(regionLabel(ctx));
-                })),
-                Pills.separator(),
-                Pills.item("Edit values…", () -> Modals.numbers(ctx, "Region",
-                        new String[]{"x", "y", "width", "height"}, Values.ints(ctx.value(), 4), picked -> {
-                            ctx.set(Values.of(picked));
-                            pill.setText(regionLabel(ctx));
-                        }))));
-        return pill;
-    }
-
-    /**
      * A slider and read-out for a bounded fractional number.
      *
      * <p>Writes continuously as the slider moves — see {@link Fields#bounded}, and the contract's note that
      * calling {@code set} repeatedly is expected.
      */
     public static Node bounded(ValueContext ctx, double min, double max, double step) {
-        double current = Values.doubleAt(ctx.value(), 0, min);
+        double current = Values.doubleAt(List.of(Slots.raw(ctx)), 0, min);
         return Fields.bounded(current, min, max, step, v -> ctx.set(trim(v)));
     }
 
-    /** A text field that commits on Enter and on losing focus. */
+    /**
+     * A text field that commits on Enter and on losing focus, over a Java string literal.
+     *
+     * <p>The value is {@code "gold.png"} in the file and {@code gold.png} in the box, which is the split
+     * {@link Slots} exists for. There were two of these until 2026-09-20 — one writing the characters into a
+     * Parameters row and this one writing a literal into a slot — and a value is written the same way
+     * everywhere now, so there is one.
+     */
     public static Node text(ValueContext ctx, String prompt) {
-        return Fields.committing(ctx.single(), prompt, ctx::set);
+        String literal = Slots.stringLiteral(Slots.raw(ctx));
+        return Fields.committing(literal == null ? "" : literal, prompt, typed -> Slots.writeText(ctx, typed));
     }
 
     /**
      * A dropdown over a fixed set.
      *
      * <p>A value the list does not contain is <b>kept and shown</b> rather than corrected: it is what the
-     * project file holds, and a plugin whose option set shrank between releases must not silently rewrite
+     * bot's source holds, and a plugin whose option set shrank between releases must not silently rewrite
      * every bot that used the option it dropped.
      */
     public static Node choice(ValueContext ctx, List<String> options) {
         List<String> items = new ArrayList<>(options == null ? List.of() : options);
-        String current = ctx.single();
+        String literal = Slots.stringLiteral(Slots.raw(ctx));
+        String current = literal == null ? "" : literal;
         if (!current.isBlank() && !items.contains(current)) items.add(current);
 
         ComboBox<String> box = Styles.on(new ComboBox<>(), Styles.INSET_FIELD_FLAT);
         box.getItems().setAll(items);
         if (!current.isBlank()) box.setValue(current);
         box.valueProperty().addListener((obs, was, now) -> {
-            if (now != null && !now.equals(was)) ctx.set(now);
+            if (now != null && !now.equals(was)) Slots.writeText(ctx, now);
         });
         return box;
     }
 
     /**
-     * A dropdown over a set that moves, over a value that may be a slot — {@link #choice}'s counterpart on
-     * the {@link Slots} side, and {@link #textSlot}'s with a list of suggestions attached.
+     * A dropdown over a set that moves — {@link #choice} with a supplier and a typeable box.
      *
-     * <p>Three differences from {@link #choice}, each of them the reason this exists:
+     * <p>Two differences from {@link #choice}, each of them the reason this exists:
      *
      * <ul>
-     *   <li><b>It writes through {@link Slots}</b>, so the value is a Java string literal in a bot's source
-     *       and the characters themselves in a Parameters row.</li>
      *   <li><b>{@code options} is a {@link Supplier} read when the list is opened</b>, never when the node is
      *       built. What there is to choose from changes while a block is on screen — a name added in another
      *       window a moment ago — and a list read at render time is the list as it was when the block first
@@ -176,8 +141,7 @@ public final class Editors {
         box.setPromptText(prompt);
 
         String literal = Slots.stringLiteral(Slots.raw(ctx));
-        String current = literal != null ? literal : ctx.single();
-        if (current != null && !current.isBlank()) box.setValue(current);
+        if (literal != null && !literal.isBlank()) box.setValue(literal);
 
         box.setOnShowing(event -> {
             List<String> items = new ArrayList<>(options == null ? List.of() : options.get());
@@ -205,10 +169,13 @@ public final class Editors {
      * <p>{@code items} is a {@link Supplier} and is called when the pill is opened, never when it is built:
      * what there is to choose from moves — a template captured a moment ago, an emulator that just started —
      * and a list read at render time is the list as it was when the block first appeared.
+     *
+     * <p>A {@link Thumbnail}'s {@code value} is the Java expression written into the bot's source, so an item
+     * naming a picture carries {@code Pictures.ORE} or {@code "images/ore.png"} rather than {@code ore}.
      */
     public static Node gallery(ValueContext ctx, String title, Supplier<List<Thumbnail>> items,
                                String emptyMessage) {
-        MenuButton pill = Pills.bare(Values.labelOr(ctx.single(), "Choose…"));
+        MenuButton pill = Pills.bare(Values.labelOr(Slots.raw(ctx), "Choose…"));
         Pills.onOpen(pill, () -> List.of(
                 Pills.item("Choose…", () -> Modals.chooser(ctx, title,
                         items == null ? List.of() : items.get(), emptyMessage, picked -> {
@@ -217,7 +184,7 @@ public final class Editors {
                         })),
                 Pills.separator(),
                 Pills.item("Clear", () -> {
-                    ctx.set(List.of());
+                    ctx.set("");
                     pill.setText("Choose…");
                 })));
         return pill;
@@ -512,22 +479,6 @@ public final class Editors {
         } catch (NumberFormatException e) {
             return raw;
         }
-    }
-
-    /** {@code 12, 34} — or the placeholder, when nothing has been chosen. */
-    private static String numbersLabel(ValueContext ctx, int count, String title) {
-        if (Values.isBlank(ctx.value())) return "Set " + title.toLowerCase() + "…";
-        int[] v = Values.ints(ctx.value(), count);
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < v.length; i++) out.append(i == 0 ? "" : ", ").append(v[i]);
-        return out.toString();
-    }
-
-    /** {@code 12, 34  800×600} — the reading order of a {@link Region}, position then size. */
-    private static String regionLabel(ValueContext ctx) {
-        if (Values.isBlank(ctx.value())) return "Choose region…";
-        int[] v = Values.ints(ctx.value(), 4);
-        return v[0] + ", " + v[1] + "  " + v[2] + "×" + v[3];
     }
 
     /** A whole number reads as one — {@code "3"}, not {@code "3.0"} — because that is what a bot's source wants. */

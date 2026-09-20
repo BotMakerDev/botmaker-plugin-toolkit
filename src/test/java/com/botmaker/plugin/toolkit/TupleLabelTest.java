@@ -73,17 +73,18 @@ class TupleLabelTest {
         assertEquals("1 × 2", Editors.tupleLabel(TestContexts.typedSlot("", "new Box(1, 2, 3)"), PAIR));
     }
 
-    /** The Parameters-row side: the same spec, the same label, a row of stored strings instead of source. */
+    /** A value with no call site — a Parameters row, a {@code @Managed} method — reads the same way. */
     @Test
-    void a_stored_row_is_labelled_the_same_way() {
-        ValueContext row = TestContexts.row("", "10", "20", "640", "480");
+    void a_value_with_no_call_site_is_labelled_the_same_way() {
+        ValueContext row = TestContexts.row("", "new Box(10, 20, 640, 480)");
         assertEquals("10, 20  640×480", Editors.tupleLabel(row, SPEC));
-        assertEquals("Choose box…", Editors.tupleLabel(TestContexts.row(""), SPEC));
+        assertEquals("Choose box…", Editors.tupleLabel(TestContexts.row("", ""), SPEC));
     }
 
     @Test
-    void a_row_holding_something_that_is_not_a_number_is_shown_verbatim() {
-        assertEquals("centre", Editors.tupleLabel(TestContexts.row("", "centre", "20", "1", "1"), SPEC));
+    void a_value_holding_something_that_is_not_a_number_is_shown_verbatim() {
+        assertEquals("target.center()",
+                Editors.tupleLabel(TestContexts.row("", "target.center()"), SPEC));
     }
 
     // --- The check itself ---
@@ -94,8 +95,8 @@ class TupleLabelTest {
     }
 
     @Test
-    void a_row_with_too_few_items_does_not_hold_numbers() {
-        assertFalse(Slots.holdsNumbers(TestContexts.row("", "1", "2"), 4));
+    void a_value_that_is_not_a_constructor_call_does_not_hold_numbers() {
+        assertFalse(Slots.holdsNumbers(TestContexts.row("", "target.bounds()"), 4));
     }
 
     /** Building a label must never write — the toolkit's rule that opening a project changes nothing. */

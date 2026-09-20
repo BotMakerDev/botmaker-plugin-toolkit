@@ -22,28 +22,28 @@ class SlotRunTest {
     @Test
     void aSlotStandingAloneHasNoRun() {
         // The ordinary case, and the one an editor must handle first: nearly every slot is a single argument.
-        assertNull(TestContexts.slot("Mouse", "click", 0, "new Point(1, 2)").run());
-        assertNull(TestContexts.row("java.awt.Color", "#ff0000").run());
+        assertTrue(TestContexts.slot("Mouse", "click", 0, "new Point(1, 2)").siblingRun().isEmpty());
+        assertTrue(TestContexts.row("java.awt.Color", "0xff0000").siblingRun().isEmpty());
     }
 
     @Test
     void aRunReportsItsElementsInOrder() {
         SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "a")
                 .withRun("a", "b", "c")
-                .run();
+                .siblingRun().orElseThrow();
         assertEquals(List.of("a", "b", "c"), run.elements());
         assertEquals(0, run.minimum());
-        assertNull(run.allowed());
+        assertTrue(run.allowedSources().isEmpty());
     }
 
     @Test
     void replacingTheRunWritesTheWholeList() {
         TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a").withRun("a", "b");
-        ctx.run().replace(List.of("a", "b", "c"), "com.example.Thing");
+        ctx.siblingRun().orElseThrow().replace(List.of("a", "b", "c"), "com.example.Thing");
 
         assertEquals(List.of("a", "b", "c"), ctx.runReplacement());
         // The run's own view moves with it, so a second edit reads what the first one wrote.
-        assertEquals(List.of("a", "b", "c"), ctx.run().elements());
+        assertEquals(List.of("a", "b", "c"), ctx.siblingRun().orElseThrow().elements());
         assertEquals(List.of("com.example.Thing"), ctx.imports());
         assertEquals(1, ctx.writes());
     }
@@ -55,10 +55,10 @@ class SlotRunTest {
         TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a")
                 .withRun(List.of("a", "b"), 2, null);
 
-        ctx.run().replace(List.of("a"));
+        ctx.siblingRun().orElseThrow().replace(List.of("a"));
 
         assertNull(ctx.runReplacement());
-        assertEquals(List.of("a", "b"), ctx.run().elements());
+        assertEquals(List.of("a", "b"), ctx.siblingRun().orElseThrow().elements());
         assertEquals(0, ctx.writes());
     }
 
@@ -69,10 +69,11 @@ class SlotRunTest {
         SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "new ImageTemplate(\"gold.png\")")
                 .withRun(List.of("new ImageTemplate(\"gold.png\")"), 1,
                         List.of("new ImageTemplate(\"gold.png\")", "new ImageTemplate(\"ore.png\")"))
-                .run();
+                .siblingRun().orElseThrow();
 
-        assertEquals(2, run.allowed().size());
-        assertTrue(run.allowed().getFirst().startsWith("new ImageTemplate("));
+        List<String> allowed = run.allowedSources().orElseThrow();
+        assertEquals(2, allowed.size());
+        assertTrue(allowed.getFirst().startsWith("new ImageTemplate("));
     }
 
     @Test

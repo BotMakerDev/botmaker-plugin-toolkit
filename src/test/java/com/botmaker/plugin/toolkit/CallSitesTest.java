@@ -74,7 +74,7 @@ class CallSitesTest {
 
     @Test
     void a_parameters_row_is_always_declined_because_it_has_no_call() {
-        assertFalse(FIRST.test(TestContexts.row("java.lang.String", "440")));
+        assertFalse(FIRST.test(TestContexts.row("java.lang.String", "\"440\"")));
     }
 
     @Test
@@ -125,13 +125,13 @@ class CallSitesTest {
         TestContexts.Recording slot = TestContexts.slot("Launcher", "start", 0, "\"440\"");
         assertEquals(0, slot.writes(), "building nothing writes nothing");
 
-        Slots.write(slot, "\"550\"", "550");
-        assertEquals("\"550\"", slot.replacement());
+        Slots.write(slot, "\"550\"");
+        assertEquals("\"550\"", slot.written());
         assertEquals(1, slot.writes());
 
-        TestContexts.Recording row = TestContexts.row("java.lang.String", "440");
-        Slots.write(row, "\"550\"", "550");
-        assertEquals(java.util.List.of("550"), row.written(),
-                "the same editor writes the stored form into a row and Java into a slot");
+        TestContexts.Recording row = TestContexts.row("java.lang.String", "\"440\"");
+        Slots.write(row, "\"550\"");
+        assertEquals("\"550\"", row.written(),
+                "one spelling everywhere: a row holds the same Java a slot does");
     }
 }

@@ -15,15 +15,12 @@ import java.util.List;
  * needs exactly this. {@link Editors} is the layer above it; this is the layer that makes the layer above
  * work in <em>both</em> of the places the host edits a value.
  *
- * <p>The host edits values in two places, and the same editor serves both (see
- * {@link com.botmaker.plugin.api.SlotEditor}). But the two <em>spell</em> a value differently: a slot in a
- * bot's source holds one string that happens to be Java — {@code new Rect(12, 40, 300, 80)} — while a row of
- * the Parameters window holds the four numbers as four strings. An editor that knew only one of those would
- * work in only one of the two places, which is exactly the limitation {@code ValueContext} was added to
- * remove.
- *
- * <p>So every method here asks {@link ValueContext#asSlot()} first and takes the other branch when the answer
- * is {@code null}. That question is asked in this class and, as far as possible, nowhere else.
+ * <p>The host edits values in more than one place and the same editor serves them all (see
+ * {@link com.botmaker.plugin.api.SlotEditor}) — a slot in a bot's source, a row of the Parameters window,
+ * and the expression a {@code @Managed} method returns. <b>All three spell a value the same way since
+ * 2026-09-20</b>: as the Java that writes it. Until then a Parameters row held a {@code List<String>} of its
+ * own, so every method here had to ask {@link ValueContext#slot()} and take a second branch — two encodings
+ * of one value, kept in step by hand. The branch is gone and so is the second encoding.
  *
  * <p><b>Nothing here throws.</b> A value may have been typed by hand, written by a newer version of this
  * plugin, or left blank; every read degrades to a default, which is the toolkit's rule 2 restated for source
@@ -33,13 +30,13 @@ public final class Slots {
 
     private Slots() {}
 
-    /** The raw text of the value — the slot's Java expression, or the first stored string. */
+    /** The Java expression the value is written as, trimmed. */
     public static String raw(ValueContext ctx) {
-        SlotContext slot = ctx.asSlot();
-        return slot != null ? slot.currentSource().trim() : ctx.single().trim();
+        String source = ctx.source();
+        return source == null ? "" : source.trim();
     }
 
-    /** Whether there is nothing there yet — a slot never filled in, or an empty row. */
+    /** Whether there is nothing there yet — a slot never filled in, or a value never set. */
     public static boolean isEmpty(ValueContext ctx) {
         return raw(ctx).isBlank();
     }
@@ -47,15 +44,13 @@ public final class Slots {
     /**
      * The {@code n} numeric arguments of the value, however it is spelled.
      *
-     * <p>For a slot, that means the arguments of a constructor call — {@code new Rect(12, 40, 300, 80)} — read
+     * <p>The arguments of a constructor or factory call — {@code new Rect(12, 40, 300, 80)} — read
      * positionally and without caring which type is being constructed, since the editor already decided that
-     * by matching on the slot's type. For a stored row it is simply the first {@code n} items. A missing or
-     * unparseable argument reads as {@code 0}, which is the value a numeric field would show anyway.
+     * by matching on the value's type. A missing or unparseable argument reads as {@code 0}, which is the
+     * value a numeric field would show anyway.
      */
     public static int[] ints(ValueContext ctx, int n) {
-        SlotContext slot = ctx.asSlot();
-        if (slot == null) return Values.ints(ctx.value(), n);
-        List<String> args = arguments(slot.currentSource());
+        List<String> args = arguments(raw(ctx));
         List<String> normalised = new ArrayList<>(args.size());
         for (String arg : args) normalised.add(literal(arg));
         return Values.ints(normalised, n);
@@ -136,14 +131,6 @@ public final class Slots {
      * whole subject: it moved out of the SDK with {@code tuplePill} on 2026-08-28 and names no SDK type.
      */
     public static boolean holdsNumbers(ValueContext ctx, int n) {
-        if (ctx.asSlot() == null) {
-            List<String> parts = ctx.value();
-            if (parts.size() < n) return false;
-            for (int i = 0; i < n; i++) {
-                if (!isNumber(parts.get(i))) return false;
-            }
-            return true;
-        }
         String raw = raw(ctx);
         if (!raw.startsWith("new ")) return false;
         List<String> args = arguments(raw);
@@ -202,46 +189,35 @@ public final class Slots {
     }
 
     /**
-     * Writes {@code numbers} as a constructor call on {@code type} in a slot, or as the numbers themselves in
-     * a stored row.
+     * Writes {@code numbers} as a constructor call on {@code type}.
      *
      * <p>The type is named fully-qualified in the expression and passed again as the import, which is the
      * combination the contract documents as always safe: the host adds the import if it is missing, and then
      * the fully-qualified name it shortens is already correct if it is not.
      */
     public static void writeConstructor(ValueContext ctx, Class<?> type, int... numbers) {
-        SlotContext slot = ctx.asSlot();
-        if (slot == null) {
-            ctx.set(Values.of(numbers));
-            return;
-        }
         Source.Expr[] arguments = new Source.Expr[numbers.length];
         for (int i = 0; i < numbers.length; i++) {
             arguments[i] = Source.number(numbers[i]);
         }
         // Source.imports rather than getName(): a nested type is Outer.Inner in both an expression and an
         // import, and Outer$Inner in neither.
-        slot.replaceWith(Source.newInstance(type, arguments), Source.imports(type));
+        ctx.set(Source.newInstance(type, arguments), Source.imports(type));
     }
 
     /**
-     * Writes a Java expression into a slot, or {@code storedForm} into a row.
+     * Writes a Java expression, adding any imports it needs.
      *
-     * <p>The two are separate arguments because they are genuinely different answers to the same question:
-     * a slot wants {@code CaptureSource.window("Diablo IV")} and the project file wants {@code Diablo IV}.
-     * An editor that has only one of them passes it twice.
+     * <p>It took a second {@code storedForm} argument until 2026-09-20, for the Parameters row that held a
+     * value as plain text rather than as Java — {@code Diablo IV} beside
+     * {@code CaptureSource.window("Diablo IV")}. A row holds the expression now, so there is one answer.
      */
-    public static void write(ValueContext ctx, String javaExpression, String storedForm, String... imports) {
-        SlotContext slot = ctx.asSlot();
-        if (slot == null) {
-            ctx.set(storedForm);
-        } else {
-            slot.replaceWith(javaExpression, imports);
-        }
+    public static void write(ValueContext ctx, String javaExpression, String... imports) {
+        ctx.set(javaExpression, imports);
     }
 
-    /** Writes plain text — a string literal in a slot, the text itself in a row. */
+    /** Writes plain text as a Java string literal. */
     public static void writeText(ValueContext ctx, String text) {
-        write(ctx, quote(text), text);
+        ctx.set(quote(text));
     }
 }

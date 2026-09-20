@@ -5,9 +5,12 @@ import com.botmaker.plugin.api.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.TypeRef;
 import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.value.ValueForm;
+import com.botmaker.plugin.api.value.ValueType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Contexts a plugin's editors can be exercised against without a running Studio.
@@ -21,18 +24,17 @@ import java.util.List;
  * <pre>{@code
  * var ctx = TestContexts.slot("Game", "launchSteam", 0, "\"440\"");
  * assertTrue(STEAM_APP_ID.test(ctx));
- * assertFalse(STEAM_APP_ID.test(TestContexts.row("appId", "440")));
+ * assertFalse(STEAM_APP_ID.test(TestContexts.row("java.lang.String", "\"440\"")));
  * }</pre>
  *
  * <h2>What is real and what is not</h2>
  *
- * <p>The value, the type, the call site and the writes are <b>real</b>: {@link Recording#written()} and
- * {@link Recording#replacement()} return exactly what the editor asked for, so a test asserts on the string
- * that would have reached the file. {@link ValueContext#services()} is <b>not</b>: it answers {@code null},
- * because every one of those services is the host doing something a test has no way to fake — dragging a
- * region on a real screen, owning a real window. An editor that reaches for one in a test fails with an NPE
- * naming the line, which is the honest outcome; test that editor's <em>predicate</em> here and its dialog by
- * hand.
+ * <p>The value, the type, the call site and the writes are <b>real</b>: {@link Recording#written()} returns
+ * exactly the expression the editor asked for, so a test asserts on the string that would have reached the
+ * file. {@link ValueContext#services()} is <b>not</b>: it answers {@code null}, because every one of those
+ * services is the host doing something a test has no way to fake — dragging a region on a real screen, owning
+ * a real window. An editor that reaches for one in a test fails with an NPE naming the line, which is the
+ * honest outcome; test that editor's <em>predicate</em> here and its dialog by hand.
  *
  * <p>Building a JavaFX control still needs the FX toolkit started. That is JavaFX's rule, not this class's:
  * run those tests on an initialised toolkit, or keep to the predicates, which touch no control at all.
@@ -42,14 +44,17 @@ public final class TestContexts {
     private TestContexts() {}
 
     /**
-     * A Parameters-window row: a value with a type and no call behind it.
+     * A value with a type and no call behind it — a Parameters row, or a {@code @Managed} method's value.
      *
-     * <p>{@link ValueContext#asSlot()} answers {@code null} here, which is the case every call-site predicate
-     * must decline — and the one most easily forgotten, because it is the case that cannot arise while an
-     * editor is being developed against a bot's source.
+     * <p>{@link ValueContext#slot()} is empty here, which is the case every call-site predicate must decline
+     * — and the one most easily forgotten, because it is the case that cannot arise while an editor is being
+     * developed against a bot's source.
+     *
+     * @param typeName the declared type, simple or qualified
+     * @param source   the Java expression the value is written as — {@code "\"gold.png\""}, {@code "3"}
      */
-    public static Recording row(String typeName, String... value) {
-        return new Recording(typeName, List.of(value), null, null, null, -1);
+    public static Recording row(String typeName, String source) {
+        return new Recording(typeName, source, false, null, null, -1);
     }
 
     /**
@@ -62,22 +67,20 @@ public final class TestContexts {
      */
     public static Recording slot(String enclosingClass, String enclosingMethod, int argIndex,
                                  String currentSource) {
-        return new Recording("", List.of(currentSource == null ? "" : currentSource),
-                currentSource, enclosingClass, enclosingMethod, argIndex);
+        return new Recording("", currentSource, true, enclosingClass, enclosingMethod, argIndex);
     }
 
     /** A slot of a known type with no call around it — a field initialiser, a local declaration. */
     public static Recording typedSlot(String typeName, String currentSource) {
-        return new Recording(typeName, List.of(currentSource == null ? "" : currentSource),
-                currentSource, null, null, -1);
+        return new Recording(typeName, currentSource, true, null, null, -1);
     }
 
     /**
      * A context that records what an editor writes instead of writing it anywhere.
      *
-     * <p>It implements {@link SlotContext} in every case and lies about one thing only: {@link #asSlot()}
-     * answers {@code null} for a row, exactly as the host's own does. That is the single behaviour a
-     * call-site predicate turns on, so getting it right here is most of what this class is for.
+     * <p>It implements {@link SlotContext} in every case and lies about one thing only: {@link #slot()}
+     * is empty for a row, exactly as the host's own is. That is the single behaviour a call-site predicate
+     * turns on, so getting it right here is most of what this class is for.
      */
     public static final class Recording implements SlotContext {
 
@@ -87,9 +90,7 @@ public final class TestContexts {
         private final String enclosingMethod;
         private final int argIndex;
 
-        private List<String> value;
-        private String currentSource;
-        private String replacement;
+        private String source;
         private final List<String> imports = new ArrayList<>();
         private String enclosingReplacement;
         private String enclosingSource;
@@ -100,12 +101,11 @@ public final class TestContexts {
         private List<String> runAllowed;
         private List<String> runReplacement;
 
-        private Recording(String typeName, List<String> value, String currentSource,
+        private Recording(String typeName, String source, boolean isSlot,
                           String enclosingClass, String enclosingMethod, int argIndex) {
             this.typeName = typeName == null ? "" : typeName;
-            this.value = List.copyOf(value);
-            this.currentSource = currentSource;
-            this.isSlot = currentSource != null;
+            this.source = source == null ? "" : source;
+            this.isSlot = isSlot;
             this.enclosingClass = enclosingClass;
             this.enclosingMethod = enclosingMethod;
             this.argIndex = argIndex;
@@ -130,8 +130,8 @@ public final class TestContexts {
         /**
          * Makes this slot part of a {@link SlotRun} of {@code elements}, as a varargs argument is.
          *
-         * <p>Without it {@link #run()} answers {@code null}, which is what nearly every real slot answers and
-         * so the case an editor must handle first. {@code minimum} and {@code allowed} are the host's two
+         * <p>Without it {@link #siblingRun()} is empty, which is what nearly every real slot answers and so
+         * the case an editor must handle first. {@code minimum} and {@code allowed} are the host's two
          * narrowings — how few elements the surrounding code still compiles with, and the only element
          * sources it will accept ({@code null} for no limit).
          */
@@ -152,17 +152,12 @@ public final class TestContexts {
             return runReplacement;
         }
 
-        /** What {@link #set} was last given — the stored form, for a row. */
-        public List<String> written() {
-            return value;
+        /** The Java expression the value now holds — what {@link #set} was last given, or the initial one. */
+        public String written() {
+            return source;
         }
 
-        /** What {@link #replaceWith} was last given — the Java expression, for a slot. */
-        public String replacement() {
-            return replacement;
-        }
-
-        /** The imports the last {@code replaceWith} asked for. */
+        /** The imports the last {@link #set} asked for. */
         public List<String> imports() {
             return List.copyOf(imports);
         }
@@ -199,14 +194,25 @@ public final class TestContexts {
             };
         }
 
+        /**
+         * A leaf of the declared type — enough for an editor that matches on a type, which is nearly all of
+         * them. An editor claiming a composite is tested against a form it builds itself.
+         */
         @Override
-        public List<String> value() {
-            return value;
+        public ValueForm form() {
+            return ValueForm.of(ValueType.of(typeName.isEmpty() ? "?" : typeName).source(typeName).build());
         }
 
         @Override
-        public void set(List<String> value) {
-            this.value = value == null ? List.of() : List.copyOf(value);
+        public String source() {
+            return source;
+        }
+
+        @Override
+        public void set(String javaExpression, String... importsNeeded) {
+            this.source = javaExpression == null ? "" : javaExpression;
+            this.imports.clear();
+            if (importsNeeded != null) this.imports.addAll(List.of(importsNeeded));
             writes++;
         }
 
@@ -217,23 +223,18 @@ public final class TestContexts {
         }
 
         @Override
-        public SlotContext asSlot() {
-            return isSlot ? this : null;
+        public Optional<SlotContext> slot() {
+            return isSlot ? Optional.of(this) : Optional.empty();
         }
 
         @Override
-        public String currentSource() {
-            return currentSource == null ? "" : currentSource;
+        public Optional<String> enclosingClassName() {
+            return Optional.ofNullable(enclosingClass);
         }
 
         @Override
-        public String enclosingClass() {
-            return enclosingClass;
-        }
-
-        @Override
-        public String enclosingMethod() {
-            return enclosingMethod;
+        public Optional<String> enclosingMethodName() {
+            return Optional.ofNullable(enclosingMethod);
         }
 
         @Override
@@ -242,31 +243,21 @@ public final class TestContexts {
         }
 
         @Override
-        public String enclosingSource() {
-            return enclosingSource;
-        }
-
-        @Override
-        public void replaceWith(String javaExpression, String... importsNeeded) {
-            this.replacement = javaExpression;
-            this.currentSource = javaExpression;
-            this.value = List.of(javaExpression == null ? "" : javaExpression);
-            this.imports.clear();
-            if (importsNeeded != null) this.imports.addAll(List.of(importsNeeded));
-            writes++;
+        public Optional<String> enclosingCall() {
+            return Optional.ofNullable(enclosingSource);
         }
 
         /**
-         * The run set up by {@link #withRun}, or {@code null}.
+         * The run set up by {@link #withRun}, or empty.
          *
          * <p>{@link SlotRun#replace} records rather than writes, and it enforces {@link SlotRun#minimum()}
          * exactly as the host does — a shorter list leaves the elements alone and counts no write, so a test
          * can assert that an editor's floor is honoured rather than trusting it.
          */
         @Override
-        public SlotRun run() {
-            if (runElements == null) return null;
-            return new SlotRun() {
+        public Optional<SlotRun> siblingRun() {
+            if (runElements == null) return Optional.empty();
+            return Optional.of(new SlotRun() {
                 @Override
                 public List<String> elements() {
                     return runElements;
@@ -278,8 +269,8 @@ public final class TestContexts {
                 }
 
                 @Override
-                public List<String> allowed() {
-                    return runAllowed;
+                public Optional<List<String>> allowedSources() {
+                    return Optional.ofNullable(runAllowed);
                 }
 
                 @Override
@@ -292,7 +283,7 @@ public final class TestContexts {
                     if (importsNeeded != null) imports.addAll(List.of(importsNeeded));
                     writes++;
                 }
-            };
+            });
         }
 
         @Override

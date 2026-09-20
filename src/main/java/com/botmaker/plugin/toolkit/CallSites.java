@@ -21,8 +21,9 @@ import java.util.function.Predicate;
  *
  * <h2>Every predicate here declines when there is no call</h2>
  *
- * <p>{@link ValueContext#asSlot()} answers {@code null} for a row of the Parameters window, and a row has no
- * call site by construction — there is no {@code Game.launchSteam(…)} behind a variable named {@code appId}.
+ * <p>{@link ValueContext#slot()} is empty for a row of the Parameters window and for a {@code @Managed}
+ * value, and neither has a call site by construction — there is no {@code Game.launchSteam(…)} behind a
+ * variable named {@code appId}.
  * Declining is the honest answer, and it is why an editor chosen this way is <b>absent</b> from that window
  * rather than misfiring in it. Plan for that: a value that must be editable in both places needs a
  * type-matched editor too, or it needs to be a type of its own.
@@ -56,10 +57,11 @@ public final class CallSites {
     public static Predicate<ValueContext> argumentOf(Class<?> owner, int index, String... methods) {
         String[] names = methods == null ? new String[0] : methods.clone();
         return ctx -> {
-            SlotContext slot = ctx.asSlot();
+            SlotContext slot = ctx.slot().orElse(null);
             if (slot == null || slot.argIndex() != index || !isOn(slot, owner)) return false;
+            String called = slot.enclosingMethodName().orElse(null);
             for (String method : names) {
-                if (method != null && method.equals(slot.enclosingMethod())) return true;
+                if (method != null && method.equals(called)) return true;
             }
             return false;
         };
@@ -75,9 +77,9 @@ public final class CallSites {
      */
     public static Predicate<ValueContext> firstArgumentWhere(Class<?> owner, Predicate<String> methods) {
         return ctx -> {
-            SlotContext slot = ctx.asSlot();
+            SlotContext slot = ctx.slot().orElse(null);
             return slot != null && slot.argIndex() == 0 && isOn(slot, owner)
-                   && methods.test(slot.enclosingMethod() == null ? "" : slot.enclosingMethod());
+                   && methods.test(slot.enclosingMethodName().orElse(""));
         };
     }
 
@@ -93,9 +95,9 @@ public final class CallSites {
     public static Predicate<ValueContext> trailingArgumentOf(Class<?> owner, Map<String, Integer> firstVarargIndex) {
         Map<String, Integer> table = Map.copyOf(firstVarargIndex);
         return ctx -> {
-            SlotContext slot = ctx.asSlot();
+            SlotContext slot = ctx.slot().orElse(null);
             if (slot == null || !isOn(slot, owner)) return false;
-            Integer from = table.get(slot.enclosingMethod());
+            Integer from = table.get(slot.enclosingMethodName().orElse(""));
             return from != null && slot.argIndex() >= from;
         };
     }
@@ -107,7 +109,7 @@ public final class CallSites {
      * question the same way the rest of them do, rather than re-deriving the two spellings.
      */
     public static boolean isOn(SlotContext slot, Class<?> owner) {
-        String name = slot == null ? null : slot.enclosingClass();
+        String name = slot == null ? null : slot.enclosingClassName().orElse(null);
         String simple = owner.getSimpleName();
         return name != null && (name.equals(simple) || name.endsWith("." + simple));
     }

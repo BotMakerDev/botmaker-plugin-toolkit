@@ -7,7 +7,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.1.4; re-released for updated upstream pins.
+### Changed
+
+- **A value is Java source everywhere, so `Slots` no longer branches.** `raw`, `ints`, `holdsNumbers`,
+  `writeConstructor`, `write` and `writeText` each had two halves — the slot's Java expression, and a
+  Parameters row's stored strings — and asked `ValueContext.asSlot()` to choose. A row holds the same
+  expression a slot does now, so there is one answer and no question. **`Slots.write` loses its
+  `storedForm` argument**: it was the second spelling (`Diablo IV` beside
+  `CaptureSource.window("Diablo IV")`), and there is one spelling.
+- **`Editors.text` and `Editors.choice` write Java.** Both wrote the characters themselves into a row and
+  had a `*Slot` twin that wrote a literal; each pair is now one member. `Editors.bounded` and
+  `Editors.gallery` follow, and a `Thumbnail`'s `value` is the expression written into the bot's source.
+- **`TestContexts.row(String, String...)` is `row(String, String)`** — one Java expression, not a row of
+  stored items — and `Recording.written()` answers that expression. `Recording.replacement()` is gone with
+  the distinction it named, and `withRun` is read back through `siblingRun()`.
+
+### Removed
+
+- **`Editors.numbers` and `Editors.region`.** Both were the row-only half of `Editors.tuplePill`, which
+  draws the same pill over the same numbers and is what every caller already used.
 
 No source changes since v0.1.3; re-released for updated upstream pins.
 

@@ -383,7 +383,7 @@ public final class Modals {
         stage.setTitle(title);
         stage.setScene(services == null ? new javafx.scene.Scene(root) : services.theme().scene(root));
         if (services != null) {
-            javafx.stage.Window owner = services.dialogs().owner();
+            javafx.stage.Window owner = services.dialogs().ownerWindow().orElse(null);
             if (owner != null) {
                 stage.initOwner(owner);
                 stage.initModality(Modality.WINDOW_MODAL);
