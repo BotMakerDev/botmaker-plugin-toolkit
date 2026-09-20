@@ -3,6 +3,7 @@ package com.botmaker.plugin.toolkit;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -167,6 +168,59 @@ class SourceTest {
     void a_missing_type_or_name_is_refused_before_anything_is_emitted() {
         assertThrows(IllegalArgumentException.class, () -> Source.requireMethod(null, "valueOf"));
         assertThrows(IllegalArgumentException.class, () -> Source.requireMethod(String.class, " "));
+    }
+
+    // ---- reading a literal back --------------------------------------------------------------------
+
+    /**
+     * The property that matters: whatever a user typed or pasted, writing it and reading it back is the
+     * identity.
+     *
+     * <p>It is here rather than in a plugin because the escaping is here — an inverse kept in a different
+     * file from the thing it inverts is one that drifts, and the drift is silent in exactly the direction
+     * that hurts: the value is written correctly and then read as nothing, so the editor shows the user a
+     * cell it refuses to edit.
+     */
+    @Test
+    void every_string_survives_being_written_and_read_back() {
+        for (String text : new String[] {"", "hello", "a \"quoted\" one", "back\\slash", "tab\there",
+                "line\nbreak", "comma, inside", "'single'", "form\ffeed", "bell\u0007", "del\u007f"}) {
+            String literal = Source.string(text).source();
+            assertEquals(Optional.of(text), Source.stringValue(literal), literal);
+        }
+    }
+
+    @Test
+    void every_character_survives_being_written_and_read_back() {
+        for (char c : new char[] {'x', '\'', '"', '\\', '\n', '\t', ' ', '\u0000', '\u007f'}) {
+            String literal = Source.character(c).source();
+            assertEquals(Optional.of(c), Source.characterValue(literal), literal);
+        }
+    }
+
+    /**
+     * Anything this class did not write answers empty, so the host shows it rather than rewriting it.
+     *
+     * <p>The concatenation is the one worth naming: {@code "a" + "b"} ends in a quote and begins with one,
+     * so a reader checking only the ends would read it as the single string {@code a" + "b}.
+     */
+    @Test
+    void a_source_this_class_did_not_write_is_not_a_literal() {
+        assertEquals(Optional.empty(), Source.stringValue("\"a\" + \"b\""));
+        assertEquals(Optional.empty(), Source.stringValue("name()"));
+        assertEquals(Optional.empty(), Source.stringValue("\"unterminated"));
+        assertEquals(Optional.empty(), Source.stringValue("\"\\q\""));      // not an escape we emit
+        assertEquals(Optional.empty(), Source.stringValue("\"\\101\""));    // octal: a person wrote this
+        assertEquals(Optional.empty(), Source.stringValue(null));
+        assertEquals(Optional.empty(), Source.characterValue("'ab'"));
+        assertEquals(Optional.empty(), Source.characterValue("c"));
+    }
+
+    /** Whitespace a formatter left is the caller's, not the value's. */
+    @Test
+    void surrounding_whitespace_is_tolerated() {
+        assertEquals(Optional.of("hi"), Source.stringValue("  \"hi\"  "));
+        assertEquals(Optional.of(' '), Source.characterValue("  ' '  "));
     }
 
     // ---- imports -----------------------------------------------------------------------------------

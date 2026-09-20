@@ -4,6 +4,7 @@ import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Java source, spelled correctly — the one place a plugin writes an expression a bot will compile.
@@ -133,6 +134,86 @@ public final class Source {
      */
     public static Expr character(char c) {
         return new Expr("'" + escape(c, '\'') + "'");
+    }
+
+    /**
+     * {@link #string} read backwards: the text a Java string literal holds, or empty when {@code javaSource}
+     * is not one literal.
+     *
+     * <p><b>Here because the escaping is here.</b> A plugin's {@code ValueCodec.valueOfLiteral} has to undo
+     * exactly what its {@code literal} wrote, and an inverse kept in a different file from the thing it
+     * inverts is one that drifts — which is how a pasted tab came to be written correctly and read back as
+     * nothing.
+     *
+     * <p>Deliberately strict, and strict is the safe direction: a concatenation, an unescaped quote in the
+     * middle and an octal escape all answer empty, because each means the source was written by a person
+     * rather than by {@link #string}, and the host shows what it cannot read rather than rewriting it.
+     */
+    public static Optional<String> stringValue(String javaSource) {
+        String source = javaSource == null ? "" : javaSource.strip();
+        if (source.length() < 2 || source.charAt(0) != '"' || !source.endsWith("\"")) {
+            return Optional.empty();
+        }
+        StringBuilder out = new StringBuilder();
+        return unescape(source.substring(1, source.length() - 1), '"', out)
+                ? Optional.of(out.toString())
+                : Optional.empty();
+    }
+
+    /** {@link #character} read backwards: the character a Java char literal holds, or empty. */
+    public static Optional<Character> characterValue(String javaSource) {
+        String source = javaSource == null ? "" : javaSource.strip();
+        if (source.length() < 3 || source.charAt(0) != '\'' || !source.endsWith("'")) {
+            return Optional.empty();
+        }
+        StringBuilder out = new StringBuilder();
+        return unescape(source.substring(1, source.length() - 1), '\'', out) && out.length() == 1
+                ? Optional.of(out.charAt(0))
+                : Optional.empty();
+    }
+
+    /**
+     * The body of a literal, unescaped into {@code out}; false when it is not one this class wrote.
+     *
+     * <p>{@code quote} is the delimiter, which may not appear unescaped inside — that is what tells one
+     * literal from a concatenation of two.
+     */
+    private static boolean unescape(String body, char quote, StringBuilder out) {
+        for (int i = 0; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (c != '\\') {
+                if (c == quote) return false;
+                out.append(c);
+                continue;
+            }
+            if (++i >= body.length()) return false;
+            switch (body.charAt(i)) {
+                case 'n' -> out.append('\n');
+                case 't' -> out.append('\t');
+                case 'r' -> out.append('\r');
+                case 'b' -> out.append('\b');
+                case 'f' -> out.append('\f');
+                case 's' -> out.append(' ');
+                case '0' -> out.append('\0');
+                case '\\', '"', '\'' -> out.append(body.charAt(i));
+                // The one escape nobody types and this class emits anyway: a control character, which a user
+                // can paste without ever seeing it. Refusing it here would make exactly those values
+                // write-only.
+                case 'u' -> {
+                    if (i + 4 >= body.length()) return false;
+                    try {
+                        out.append((char) Integer.parseInt(body.substring(i + 1, i + 5), 16));
+                    } catch (NumberFormatException notAnEscape) {
+                        return false;
+                    }
+                    i += 4;
+                }
+                default -> {
+                    return false;                            // an octal escape: not ours to read
+                }
+            }
+        }
+        return true;
     }
 
     /**

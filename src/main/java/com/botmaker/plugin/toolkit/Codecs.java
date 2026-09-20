@@ -2,17 +2,19 @@ package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.value.ValueCodec;
 
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
  * {@link ValueCodec}s built from lambdas instead of anonymous classes.
  *
- * <p>A codec is three one-line answers — what stored text means, how to store a value back, how to write it
- * as Java — and spelling that as an anonymous class costs eleven lines of ceremony per type. A plugin
- * registering a dozen types wrote the same eleven lines a dozen times, which is what this replaces:
+ * <p>A codec is four one-line answers — what stored text means, how to store a value back, how to write it
+ * as Java and how to read that Java back — and spelling that as an anonymous class costs fourteen lines of
+ * ceremony per type. A plugin registering a dozen types wrote the same fourteen lines a dozen times, which
+ * is what this replaces:
  *
  * <pre>{@code
- * catalog.add(CHANNEL, Codecs.of(Channel::parse, Channel::name, c -> "Channel." + c.name()));
+ * catalog.add(CHANNEL, Codecs.ofEnum(Channel::parse, "Channel"));
  * }</pre>
  *
  * <h2>Totality is still the caller's, and this class cannot give it</h2>
@@ -31,9 +33,18 @@ public final class Codecs {
 
     private Codecs() {}
 
-    /** A codec from its three answers. Totality is the caller's; see this class's note. */
+    /**
+     * A codec from its four answers. Totality is the caller's; see this class's note.
+     *
+     * <p><b>There is no three-argument form, deliberately.</b> One existed and it defaulted the reader to
+     * "I do not recognise this", which is how eight of the seventeen shipped value types came to be written
+     * into a user's Java by an editor that then refused to edit them. {@code valueOfLiteral} is the inverse
+     * of {@code literal} and belongs in the same expression as it, where the author has both in front of
+     * them.
+     */
     public static <T> ValueCodec<T> of(Function<String, T> parse, Function<T, String> store,
-                                       Function<T, String> literal) {
+                                       Function<T, String> literal,
+                                       Function<String, Optional<T>> valueOfLiteral) {
         return new ValueCodec<>() {
             @Override
             public T parse(String wire) {
@@ -49,6 +60,11 @@ public final class Codecs {
             public String literal(T value) {
                 return literal.apply(value);
             }
+
+            @Override
+            public Optional<T> valueOfLiteral(String javaSource) {
+                return javaSource == null ? Optional.empty() : valueOfLiteral.apply(javaSource.strip());
+            }
         };
     }
 
@@ -59,9 +75,21 @@ public final class Codecs {
      * the import is arranged from the type's {@code importName()}. Passed rather than taken from the class,
      * because a plugin whose enum is nested or aliased knows the spelling it wants and the reflection answer
      * would be wrong for both.
+     *
+     * <p>Reading one back is the only case this class can supply the inverse for by itself, because the
+     * spelling is this method's own: {@code Qualifier.NAME}, plus any package the author happened to write
+     * in front of it. A constant name {@code parse} does not know answers its fallback like any other
+     * unreadable text, so {@code store} is asked whether the round trip actually held — a source naming a
+     * constant this build does not have is not a literal this codec wrote.
      */
     public static <E extends Enum<E>> ValueCodec<E> ofEnum(Function<String, E> parse, String qualifier) {
-        return of(parse, Enum::name, e -> qualifier + "." + e.name());
+        String suffix = "." + qualifier + ".";
+        return of(parse, Enum::name, e -> qualifier + "." + e.name(), java -> {
+            if (!java.startsWith(qualifier + ".") && !java.contains(suffix)) return Optional.empty();
+            String name = java.substring(java.lastIndexOf('.') + 1);
+            E constant = parse.apply(name);
+            return constant != null && constant.name().equals(name) ? Optional.of(constant) : Optional.empty();
+        });
     }
 
     /**
@@ -93,6 +121,11 @@ public final class Codecs {
             @Override
             public String literal(T value) {
                 return codec.literal(value);
+            }
+
+            @Override
+            public Optional<T> valueOfLiteral(String javaSource) {
+                return codec.valueOfLiteral(javaSource);
             }
 
             @Override
@@ -128,6 +161,11 @@ public final class Codecs {
             @Override
             public String literal(T value) {
                 return codec.literal(value);
+            }
+
+            @Override
+            public Optional<T> valueOfLiteral(String javaSource) {
+                return codec.valueOfLiteral(javaSource);
             }
 
             @Override

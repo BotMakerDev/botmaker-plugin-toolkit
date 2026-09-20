@@ -90,7 +90,7 @@ the lift out of the SDK, five more that are not widgets at all:
 |---|---|---|
 | `Slots` | reads and writes a value that is Java source in a slot and stored text in a Parameters row | not a line of it named an SDK type; **every** editor that can sit in source needs it |
 | `CallSites` | the four matcher shapes for an editor chosen by the call around a value, not by its type | the matching is generic; the class and method **names** are the plugin's and stay there |
-| `Codecs` | `ValueCodec`s from lambdas, plus `or` (total) and `seeded` | three one-line answers should not cost eleven lines of anonymous class per type |
+| `Codecs` | `ValueCodec`s from lambdas, plus `or` (total) and `seeded` | four one-line answers should not cost fourteen lines of anonymous class per type; there is no three-argument `of`, because the reader it defaulted away is how eight of seventeen types became write-only |
 | `AbstractStudioPlugin` | the four contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
 

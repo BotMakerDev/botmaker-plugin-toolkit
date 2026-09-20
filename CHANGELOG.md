@@ -22,8 +22,22 @@ No source changes since v0.1.0; re-released for updated upstream pins.
 - **`Region`**, moved here from `com.botmaker.plugin.api.Region` unchanged. `ScreenPicks` is the only thing
   that produces one and `Editors` the only thing that consumes one, so it is this module's type. Update the
   import; nothing else changes.
+- **`Source.stringValue(String)` and `Source.characterValue(String)`** — the escaping read backwards. A
+  plugin's `ValueCodec.valueOfLiteral` has to undo exactly what its `literal` wrote, and an inverse kept in a
+  different file from the thing it inverts drifts silently in the direction that hurts: the value is written
+  correctly and then read as nothing, so the editor shows a cell it refuses to edit. Strict, so a
+  concatenation or a spelling this class never emits answers empty and the host shows the source as it
+  stands.
 
 ### Changed
+
+- **`Codecs.of` takes four functions, not three**, the fourth being `valueOfLiteral` — the contract's reader,
+  which has no default any more. There is deliberately no three-argument form: the one that existed defaulted
+  the reader to *I do not recognise this*, which is how eight of the seventeen shipped value types came to be
+  write-only. **`Codecs.ofEnum` supplies the inverse itself**, since the spelling is its own; it checks the
+  constant name against what `parse` answers rather than trusting it, because these parsers are total and
+  fall back, and reading `Direction.UP` as `NORTH` would replace a value the user wrote with one they did
+  not. `or` and `seeded` forward the new method.
 
 - **This module is a widget kit and its one dependency is still JavaPoet.** For part of 2026-09-09 it was
   not: `com.botmaker.plugin.toolkit.config` — `Settings`, `ProjectValues`, `ValueGrammar`, how a running bot
