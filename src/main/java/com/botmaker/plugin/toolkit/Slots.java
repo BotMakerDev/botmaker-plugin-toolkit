@@ -1,7 +1,7 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +16,7 @@ import java.util.List;
  * work in <em>both</em> of the places the host edits a value.
  *
  * <p>The host edits values in more than one place and the same editor serves them all (see
- * {@link com.botmaker.plugin.api.SlotEditor}) — a slot in a bot's source, a row of the Parameters window,
+ * {@link com.botmaker.plugin.api.slot.SlotEditor}) — a slot in a bot's source, a row of the Parameters window,
  * and the expression a {@code @Managed} method returns. <b>All three spell a value the same way since
  * 2026-09-20</b>: as the Java that writes it. Until then a Parameters row held a {@code List<String>} of its
  * own, so every method here had to ask {@link ValueContext#slot()} and take a second branch — two encodings

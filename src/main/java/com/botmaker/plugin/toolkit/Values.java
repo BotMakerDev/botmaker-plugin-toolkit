@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reading and writing the {@code List<String>} a {@link com.botmaker.plugin.api.ValueContext} carries.
+ * Reading and writing the {@code List<String>} a {@link com.botmaker.plugin.api.slot.ValueContext} carries.
  *
  * <p>The contract is deliberate that a value is a list of strings — that is what a project file holds — and
  * equally deliberate that <em>parsing it is the editor's own job, and failing to parse it is normal</em>: a
@@ -14,7 +14,7 @@ import java.util.List;
  *
  * <p>The one thing to keep in mind: {@code ""} and "absent" are the same here. An editor that needs to tell
  * <em>never set</em> from <em>deliberately cleared</em> has to look at {@link
- * com.botmaker.plugin.api.ValueContext#value()} itself, because a one-element list holding {@code ""} and an
+ * com.botmaker.plugin.api.slot.ValueContext#value()} itself, because a one-element list holding {@code ""} and an
  * empty list both read as blank through these.
  */
 public final class Values {
@@ -58,7 +58,7 @@ public final class Values {
         return out;
     }
 
-    /** {@code numbers} as the wire form, ready for {@link com.botmaker.plugin.api.ValueContext#set(List)}. */
+    /** {@code numbers} as the wire form, ready for {@link com.botmaker.plugin.api.slot.ValueContext#set(List)}. */
     public static List<String> of(int... numbers) {
         if (numbers == null) return List.of();
         List<String> out = new ArrayList<>(numbers.length);

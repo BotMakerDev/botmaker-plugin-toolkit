@@ -5,6 +5,16 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **Recompiled against the contract's new packages.** `SlotEditor`, `SlotContext`, `SlotRun`,
+  `ValueContext` and `TypeRef` are `com.botmaker.plugin.api.slot` now, the parameter types are
+  `…api.parameters`, the toolbar types are `…api.toolbar` and the source types are `…api.source`. Imports
+  only — no toolkit type, method or behaviour changed. The table in `botmaker-studio-api`'s changelog is the
+  one to repoint an import from.
+
 ## [0.1.5] — 2026-09-21
 
 ### Changed

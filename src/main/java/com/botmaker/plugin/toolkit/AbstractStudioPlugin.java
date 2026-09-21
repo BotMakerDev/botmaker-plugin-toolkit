@@ -1,7 +1,7 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.SlotEditor;
+import com.botmaker.plugin.api.parameters.ParameterGroup;
+import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;

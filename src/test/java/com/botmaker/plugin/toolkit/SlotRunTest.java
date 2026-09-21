@@ -1,6 +1,6 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.SlotRun;
+import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import org.junit.jupiter.api.Test;
 

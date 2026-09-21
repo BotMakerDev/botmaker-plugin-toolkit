@@ -69,7 +69,7 @@ public final class Fields {
      * is beside it because the exact value still matters once the shape of the range is understood.
      *
      * <p>{@code onChange} fires continuously while dragging. That is deliberate and matches the contract's
-     * note that {@link com.botmaker.plugin.api.ValueContext#set(java.util.List)} may be called repeatedly —
+     * note that {@link com.botmaker.plugin.api.slot.ValueContext#set(java.util.List)} may be called repeatedly —
      * it is what lets an editor that previews its value track the drag.
      */
     public static HBox bounded(double value, double min, double max, double step, DoubleConsumer onChange) {

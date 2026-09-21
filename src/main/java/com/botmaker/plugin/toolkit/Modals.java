@@ -2,7 +2,7 @@ package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.Dialogs;
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;

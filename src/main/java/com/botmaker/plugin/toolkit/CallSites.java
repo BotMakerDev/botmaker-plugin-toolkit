@@ -1,7 +1,7 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 
 import java.util.Map;
 import java.util.function.Predicate;

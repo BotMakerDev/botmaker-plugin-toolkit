@@ -1,6 +1,6 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors.Pick;
 import com.botmaker.plugin.toolkit.Editors.TupleSpec;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
