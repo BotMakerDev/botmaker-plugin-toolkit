@@ -60,6 +60,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   arguments. It is `componentTypes().size()` now, and labels are naming only.
 - **`AbstractStudioPlugin.buildTypes()`** replaces `buildValueTypes()`, and `catalog()` loses the
   `pinnedVersion` argument this class was already memoising away.
+- **`Editors.gallery` writes through `setSource`.** A gallery item's value is an expression that *names*
+  something the bot declares — `Pictures.ORE` — so it was going through `set(Object)` and would have been
+  written back as a quoted string, inlining the reference the whole managed picture set is built on.
+- **`Editors.tupleLabel` asks for the value before it checks the source.** It tested `Slots.isEmpty(ctx)`
+  first, so a context holding a decoded value but no source text answered the placeholder — which reads to
+  a user as *nothing chosen* over a value they had just picked. A value is the authoritative answer
+  wherever there is one; source is what is left when there is not.
 - **`TestContexts.Recording` records the value, not a spelling.** `withValue(Object)` seeds what
   `value(Class)` answers and `value()` reads back what an editor wrote; the stub owns no grammar and does
   not pretend to. It also answers a primitive's `qualifiedName()` correctly, which the old "has it got a

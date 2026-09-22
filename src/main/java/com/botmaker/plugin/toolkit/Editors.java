@@ -168,7 +168,7 @@ public final class Editors {
      *
      * <p>A {@link Thumbnail}'s {@code value} is the Java expression written into the bot's source, so an item
      * naming a picture carries {@code Pictures.ORE} rather than {@code ore}. It goes through
-     * {@link ValueContext#set(String, Class...)} for that reason — it is a reference to something the bot
+     * {@link ValueContext#setSource(String, Class...)} for that reason — it is a reference to something the bot
      * declares, not a value this editor holds.
      */
     public static Node gallery(ValueContext ctx, String title, Supplier<List<Thumbnail>> items,
@@ -177,12 +177,12 @@ public final class Editors {
         Pills.onOpen(pill, () -> List.of(
                 Pills.item("Choose…", () -> Modals.chooser(ctx, title,
                         items == null ? List.of() : items.get(), emptyMessage, picked -> {
-                            ctx.set(picked.value());
+                            ctx.setSource(picked.value());
                             pill.setText(Values.labelOr(picked.label(), "Choose…"));
                         })),
                 Pills.separator(),
                 Pills.item("Clear", () -> {
-                    ctx.set("");
+                    ctx.setSource("");
                     pill.setText("Choose…");
                 })));
         return pill;
@@ -357,15 +357,20 @@ public final class Editors {
      * and it is the piece worth asserting: the number a user reads off the pill is read back out of what the
      * last pick wrote, and getting it wrong shows one coordinate while the bot runs another.
      *
-     * <p>The three answers correspond exactly to the three states of {@link ValueContext#value}: nothing
-     * written, a value this type describes, and an expression it does not — {@code target.center()}, which
-     * is shown as written because rewriting it into {@code 0, 0} would be a lie about what the bot does.
+     * <p>The three answers correspond exactly to the three states of {@link ValueContext#value}: a value
+     * this type describes, an expression it does not — {@code target.center()}, shown as written because
+     * rewriting it into {@code 0, 0} would be a lie about what the bot does — and nothing written at all.
+     *
+     * <p><b>The value is asked for first, and the order is the fix rather than a preference.</b> This
+     * checked {@code Slots.isEmpty(ctx)} before asking, so a context that holds a decoded value but no
+     * source text answered the placeholder — which reads to a user as "nothing chosen" over a value they
+     * had just picked. A value is the authoritative answer wherever there is one; source is what is left
+     * when there is not.
      */
     public static <T> String tupleLabel(ValueContext ctx, ComponentType<T> type, TupleSpec spec) {
-        if (Slots.isEmpty(ctx)) return spec.placeholder();
         return ctx.value(type.type())
                 .map(value -> spec.label().apply(ints(type.components(value))))
-                .orElseGet(() -> Slots.raw(ctx));
+                .orElseGet(() -> Slots.isEmpty(ctx) ? spec.placeholder() : Slots.raw(ctx));
     }
 
     /** The numbers currently in the value, or zeroes — the shape every geometry dialog opens on. */

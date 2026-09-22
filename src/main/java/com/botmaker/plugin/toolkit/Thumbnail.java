@@ -9,7 +9,7 @@ import javafx.scene.image.Image;
  * pictures in it — an image template, a template group, a game's cover art, an emulator's screen — so the
  * grid is the widget and this is its item.
  *
- * @param value what {@link com.botmaker.plugin.api.slot.ValueContext#set(String)} is called with; never shown
+ * @param value what {@link com.botmaker.plugin.api.slot.ValueContext#setSource(String, Class...)} is called with; never shown
  * @param label the caption under the picture, and what is shown when there is no picture
  * @param image the picture, or {@code null} — a missing image is an ordinary state (a template whose file
  *              was deleted, cover art that never downloaded) and renders as the label alone

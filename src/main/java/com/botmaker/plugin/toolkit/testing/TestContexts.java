@@ -172,7 +172,7 @@ public final class TestContexts {
         }
 
         /**
-         * The Java expression the value now holds — what {@link #set(String, Class...)} was last given, or
+         * The Java expression the value now holds — what {@link #setSource(String, Class...)} was last given, or
          * the initial one.
          */
         public String written() {
@@ -250,7 +250,7 @@ public final class TestContexts {
         }
 
         @Override
-        public void set(String javaExpression, Class<?>... importsNeeded) {
+        public void setSource(String javaExpression, Class<?>... importsNeeded) {
             this.source = javaExpression == null ? "" : javaExpression;
             this.imports.clear();
             if (importsNeeded != null) {
