@@ -1,6 +1,5 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.parameters.ParameterGroup;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
@@ -9,7 +8,7 @@ import com.botmaker.plugin.api.value.ValueCatalog;
 import java.util.List;
 
 /**
- * A {@link StudioPlugin} that builds each of its four contributions once, on first use.
+ * A {@link StudioPlugin} that builds each of its three contributions once, on first use.
  *
  * <pre>{@code
  * public final class DiscordPlugin extends AbstractStudioPlugin {
@@ -33,7 +32,7 @@ import java.util.List;
  * if the host asks the corresponding question.
  *
  * <p>The memoisation is a plain double-checked read on a {@code volatile} field. A hook may therefore run
- * twice under a race, which is accepted: all four answers are immutable values, and the alternative is
+ * twice under a race, which is accepted: all three answers are immutable values, and the alternative is
  * holding a lock across arbitrary plugin code that the host calls while rendering.
  *
  * <h2>What it deliberately does not do</h2>
@@ -44,7 +43,7 @@ import java.util.List;
  * this class gets out of the way. A base class that narrowed the contract to fit the common case would be
  * doing to plugins exactly what the platform exists to stop the host doing to them.
  *
- * <p>It also holds no state beyond the four cached answers and takes no services: a plugin is constructed
+ * <p>It also holds no state beyond the three cached answers and takes no services: a plugin is constructed
  * before the host has a project open, so there is nothing to hand it yet. Everything context-dependent
  * arrives later, per call, in a {@code ValueContext}.
  */
@@ -56,7 +55,6 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     private volatile PaletteCatalog catalog;
     private volatile ValueCatalog valueTypes;
     private volatile List<SlotEditor> slotEditors;
-    private volatile List<ParameterGroup> parameters;
 
     /** A plugin whose display name is its id. */
     protected AbstractStudioPlugin(String id) {
@@ -88,10 +86,9 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
         return List.of();
     }
 
-    /** The parameter sections this plugin owns. Called at most once. */
-    protected List<ParameterGroup> buildParameters() {
-        return List.of();
-    }
+    // buildParameters() stood here from 2026-09-10 to 2026-09-22, memoising a list of ParameterGroup. The
+    // contract surface it overrode is deleted: a parameter is a @Param field in the bot's own Java, and a
+    // plugin that wants a row of its own puts one in the file it ships.
 
     @Override
     public String id() {
@@ -132,17 +129,6 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
             List<SlotEditor> built = buildSlotEditors();
             local = built == null ? List.of() : List.copyOf(built);
             slotEditors = local;
-        }
-        return local;
-    }
-
-    @Override
-    public List<ParameterGroup> parameters(String pinnedVersion) {
-        List<ParameterGroup> local = parameters;
-        if (local == null) {
-            List<ParameterGroup> built = buildParameters();
-            local = built == null ? List.of() : List.copyOf(built);
-            parameters = local;
         }
         return local;
     }

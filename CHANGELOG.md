@@ -7,7 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.1.6; re-released for updated upstream pins.
+### Removed
+
+- **`AbstractStudioPlugin.buildParameters()` and the `parameters(String)` it memoised.** The contract
+  surface they overrode is deleted: nothing ever declared a parameter group, so the host read back a
+  pre-2026-09-17 project's JSON and nothing else. A parameter is a `@Param` field in the bot's own Java, and
+  a plugin that wants a row of its own puts one in the file it ships. This class now memoises three
+  contributions rather than four.
 
 ### Changed
 
