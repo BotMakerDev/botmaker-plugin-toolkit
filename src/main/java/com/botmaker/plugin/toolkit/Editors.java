@@ -1,6 +1,7 @@
 package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.value.ComponentType;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -24,24 +25,28 @@ import java.util.function.Supplier;
  *
  * <p>This is the layer the toolkit exists for. Everything under it — {@link Pills}, {@link Fields},
  * {@link Modals} — is JavaFX with the host's conventions baked in; these read the value, write it back
- * and reach {@link com.botmaker.plugin.api.StudioServices} for capture and dialogs themselves, so a
- * plugin's editor for a rectangle is a predicate and a method reference:
+ * and reach {@link com.botmaker.plugin.api.StudioServices} for dialogs themselves, so a plugin's editor for
+ * a rectangle is one method reference on its own type declaration:
  *
  * <pre>{@code
- * SlotEditor.of(c -> c.type().is(Rect.class), Editors::region)
+ * public Node editor(ValueContext ctx) { return Editors.tuplePill(ctx, this, RECT, picks); }
  * }</pre>
  *
  * <p>They were extracted from the host's own thirteen pickers rather than designed, which is why there are
- * eleven and not sixteen: these are the shapes that recurred. An editor that needs something else builds it
- * from the layer below, and the day a second one wants the same thing it is worth adding here — which is how
- * {@link #boundedPill} and {@link #flag}, and then {@link #tuplePill}, {@link #program} and
- * {@link #textSlot}, arrived out of the SDK on 2026-08-28.
+ * nine and not sixteen: these are the shapes that recurred.
  *
- * <p><b>Some read through {@link Slots} and the rest through {@link ValueContext} directly</b>, and the
- * difference is which places the editor can serve. {@code Slots} spells a value as Java when the context is
- * a slot in a bot's source and as stored text when it is a Parameters row; the plain ones write stored text
- * either way. Reach for {@code Slots} whenever the editor might sit in source — which is why {@link #text}
- * and {@link #textSlot}, and {@link #numbers} and {@link #tuplePill}, are pairs rather than one method each.
+ * <h2>They read values, not source text (2026-09-22)</h2>
+ *
+ * <p>Every one of them used to go through {@code Slots}, which parsed the Java in the slot: a numeric
+ * literal stripper here, an argument splitter there, a string unescaper in a third place, none of them
+ * agreeing with the host's. A value crosses as a value now, so {@link ValueContext#value} is the read and
+ * {@link ValueContext#set(Object)} is the write, and the pairs that existed only to span the two encodings
+ * — {@code text}/{@code textSlot}, {@code numbers}/{@code tuplePill} — collapse into one method each.
+ *
+ * <p><b>An undecodable value is shown, never overwritten.</b> {@link ValueContext#value} answers empty for
+ * a variable, a computed expression, a call from somewhere else; a pill then says what
+ * {@link Slots#raw} holds. That is the honest label, and it is why {@code Slots.holdsNumbers} is not
+ * missed: the question it asked is the question {@code value()} answers.
  *
  * <p><b>Every one of them writes only when the user acts.</b> Building an editor never sets a value — not
  * even to normalise what is already there — because a project that is merely opened and closed must come
@@ -52,43 +57,35 @@ public final class Editors {
     private Editors() {}
 
     /**
-     * Where the widgets in this class go to ask the user to point at something. See {@link ScreenPicks} for
-     * why it is supplied by the plugin rather than by the host, and why a static field is the right shape.
-     */
-    private static ScreenPicks picks = ScreenPicks.NONE;
-
-    /**
-     * Registers the screen picker every editor here uses. Call it once, from the plugin's constructor.
-     *
-     * <p>Passing {@code null} restores {@link ScreenPicks#NONE} rather than throwing, so a plugin that
-     * conditionally has no capture path can say so in one line.
-     */
-    public static void pickWith(ScreenPicks screenPicks) {
-        picks = screenPicks == null ? ScreenPicks.NONE : screenPicks;
-    }
-
-    /**
      * A slider and read-out for a bounded fractional number.
      *
      * <p>Writes continuously as the slider moves — see {@link Fields#bounded}, and the contract's note that
-     * calling {@code set} repeatedly is expected.
+     * calling {@code set} repeatedly is expected. The number is written back as the type the field is
+     * declared as; see {@link Values#setNumber}.
      */
     public static Node bounded(ValueContext ctx, double min, double max, double step) {
-        double current = Values.doubleAt(List.of(Slots.raw(ctx)), 0, min);
-        return Fields.bounded(current, min, max, step, v -> ctx.set(trim(v)));
+        double current = Values.number(ctx, min);
+        return Fields.bounded(current, min, max, step, value -> Values.setNumber(ctx, value));
     }
 
     /**
-     * A text field that commits on Enter and on losing focus, over a Java string literal.
+     * A text field that commits on Enter and on losing focus.
      *
-     * <p>The value is {@code "gold.png"} in the file and {@code gold.png} in the box, which is the split
-     * {@link Slots} exists for. There were two of these until 2026-09-20 — one writing the characters into a
-     * Parameters row and this one writing a literal into a slot — and a value is written the same way
-     * everywhere now, so there is one.
+     * <p>The value is {@code "gold.png"} in the file and {@code gold.png} in the box. There were two of
+     * these until 2026-09-20 and again until 2026-09-22 — one writing characters into a Parameters row,
+     * one writing a literal into a slot — and the host writes the literal now, so there is one.
+     *
+     * @param columns the field's width in characters, or {@code 0} for the default
      */
+    public static Node text(ValueContext ctx, String prompt, int columns) {
+        TextField field = Fields.committing(Values.text(ctx, ""), prompt, ctx::set);
+        if (columns > 0) field.setPrefColumnCount(columns);
+        return field;
+    }
+
+    /** {@link #text(ValueContext, String, int)} at the default width. */
     public static Node text(ValueContext ctx, String prompt) {
-        String literal = Slots.stringLiteral(Slots.raw(ctx));
-        return Fields.committing(literal == null ? "" : literal, prompt, typed -> Slots.writeText(ctx, typed));
+        return text(ctx, prompt, 0);
     }
 
     /**
@@ -100,15 +97,14 @@ public final class Editors {
      */
     public static Node choice(ValueContext ctx, List<String> options) {
         List<String> items = new ArrayList<>(options == null ? List.of() : options);
-        String literal = Slots.stringLiteral(Slots.raw(ctx));
-        String current = literal == null ? "" : literal;
+        String current = Values.text(ctx, "");
         if (!current.isBlank() && !items.contains(current)) items.add(current);
 
         ComboBox<String> box = Styles.on(new ComboBox<>(), Styles.INSET_FIELD_FLAT);
         box.getItems().setAll(items);
         if (!current.isBlank()) box.setValue(current);
         box.valueProperty().addListener((obs, was, now) -> {
-            if (now != null && !now.equals(was)) Slots.writeText(ctx, now);
+            if (now != null && !now.equals(was)) ctx.set(now);
         });
         return box;
     }
@@ -140,8 +136,8 @@ public final class Editors {
         box.setEditable(true);
         box.setPromptText(prompt);
 
-        String literal = Slots.stringLiteral(Slots.raw(ctx));
-        if (literal != null && !literal.isBlank()) box.setValue(literal);
+        String current = Values.text(ctx, "");
+        if (!current.isBlank()) box.setValue(current);
 
         box.setOnShowing(event -> {
             List<String> items = new ArrayList<>(options == null ? List.of() : options.get());
@@ -150,7 +146,7 @@ public final class Editors {
             box.getItems().setAll(items);
         });
         box.valueProperty().addListener((obs, was, now) -> {
-            if (now != null && !now.isBlank() && !now.equals(was)) Slots.writeText(ctx, now);
+            if (now != null && !now.isBlank() && !now.equals(was)) ctx.set(now);
         });
         // An editable ComboBox commits its editor to valueProperty on Enter and on nothing else, so clicking
         // away from a typed name would lose it — the same edit a bare TextField loses, and the reason
@@ -171,7 +167,9 @@ public final class Editors {
      * and a list read at render time is the list as it was when the block first appeared.
      *
      * <p>A {@link Thumbnail}'s {@code value} is the Java expression written into the bot's source, so an item
-     * naming a picture carries {@code Pictures.ORE} or {@code "images/ore.png"} rather than {@code ore}.
+     * naming a picture carries {@code Pictures.ORE} rather than {@code ore}. It goes through
+     * {@link ValueContext#set(String, Class...)} for that reason — it is a reference to something the bot
+     * declares, not a value this editor holds.
      */
     public static Node gallery(ValueContext ctx, String title, Supplier<List<Thumbnail>> items,
                                String emptyMessage) {
@@ -216,15 +214,12 @@ public final class Editors {
      * a position a person finds. Unlike {@link #bounded}, the value is <b>not</b> written while dragging —
      * this shape is for a slot in a bot's source, and a slider that rewrote the file on every pixel of the
      * drag would fill the undo stack with values nobody chose.
-     *
-     * <p>Reads and writes through {@link Slots}, so it serves a slot and a Parameters row alike; whether the
-     * editor is <em>offered</em> in both is the predicate's business, not this one's.
      */
     public static Node boundedPill(ValueContext ctx, NumberRange range) {
         MenuButton pill = Pills.bare(rangeLabel(ctx, range));
         Pills.onOpen(pill, () -> List.of(
                 Pills.item("Set " + range.label().toLowerCase() + "…", () -> {
-                    double current = rangeCurrent(ctx, range);
+                    double current = Values.number(ctx, range.fallback());
                     if (range.whole()) {
                         Spinner<Integer> spinner = Fields.integer((int) Math.round(current),
                                 (int) range.min(), (int) range.max());
@@ -252,12 +247,16 @@ public final class Editors {
      * confirm the tick they just made is a window. It carries {@code label} because {@code enableDebug(true)}
      * beside a bare box reads as though the box is the argument to something else — which, without the label,
      * is exactly what it looks like.
+     *
+     * <p>It wrote {@code Slots.write(ctx, "true", "true")} until 2026-09-22, and the second {@code "true"}
+     * landed in the varargs tail that meant <em>imports needed</em> — a leftover from the {@code storedForm}
+     * parameter deleted two days earlier, asking the host for an import of a class called {@code true}.
+     * {@link ValueContext#set(Object)} has no tail for it to fall into.
      */
     public static Node flag(ValueContext ctx, String label) {
         CheckBox box = new CheckBox(label);
-        box.setSelected(Boolean.parseBoolean(Slots.raw(ctx)));
-        box.setOnAction(e -> Slots.write(ctx, Boolean.toString(box.isSelected()),
-                Boolean.toString(box.isSelected())));
+        box.setSelected(Values.flag(ctx, false));
+        box.setOnAction(e -> ctx.set(box.isSelected()));
         return box;
     }
 
@@ -297,43 +296,54 @@ public final class Editors {
     }
 
     /**
-     * A small tuple of whole numbers that is also a thing on the screen.
+     * The words around a tuple of whole numbers — everything about the editor that is not the type.
      *
-     * <p>The shape behind every coordinate editor: a pill showing the numbers, a way to take them off the
-     * screen, and a way to type them. Taking them off the screen is what it exists for — nobody knows that a
-     * health bar is 240 pixels wide, they know where its ends are.
+     * <p><b>It carried the type and the number of numbers until 2026-09-22</b>, as a {@code Class<?>} and a
+     * {@code labels.length}, and a third arity was implied by whichever {@code Slots.writeConstructor} call
+     * the pick arm made. Three independent statements of one fact, with nothing checking them: a
+     * {@code labels} array one short of the constructor wrote a {@code Rect} with three arguments.
+     * {@link #tuplePill} takes the type as a {@link ComponentType} now, so the arity is
+     * {@code componentTypes().size()} and there is one of it. Labels that do not match are padded or
+     * ignored rather than deciding anything.
      *
-     * @param type        the class the slot's expression constructs; the same class is passed as the import
      * @param title       the value's name, used as the dialog's title and in the empty pill's placeholder
-     * @param labels      one per number, in constructor order — this is also how many numbers there are
+     * @param labels      one per number, in component order — naming only
      * @param placeholder what the pill says with nothing chosen yet
      * @param pick        how the numbers come off the screen, if they can
      * @param label       the numbers as the pill spells them, which is the part every tuple words differently
      */
-    public record TupleSpec(Class<?> type, String title, String[] labels, String placeholder, Pick pick,
+    public record TupleSpec(String title, String[] labels, String placeholder, Pick pick,
                             Function<int[], String> label) {}
 
     /**
-     * A pill over a {@link TupleSpec}: the numbers, a screen picker and a typed dialog.
+     * A pill over a tuple of whole numbers that is also a thing on the screen: the numbers, a screen picker
+     * and a typed dialog.
      *
-     * <p>Reads and writes through {@link Slots}, so one editor serves a slot in a bot's source and a row of
-     * the Parameters window; the slot gets {@code new Rect(12, 40, 300, 80)} and the row gets four strings.
+     * <p>The shape behind every coordinate editor. Taking the numbers off the screen is what it exists for —
+     * nobody knows that a health bar is 240 pixels wide, they know where its ends are.
      *
-     * <p>Distinct from {@link #numbers}, which is the same idea without a screen and without a constructor:
-     * that one writes stored values through {@code ctx.set} and cannot appear in source.
+     * <p>One editor serves a slot in a bot's source, a row of the Parameters window and a {@code @Managed}
+     * value: the value crosses as a value and the host spells it, so there is nothing left for the editor to
+     * know about where it is being shown.
+     *
+     * @param type  the plugin's own declaration of the type — where the arity, the components and the way
+     *              back from numbers to a value all come from
+     * @param picks where a screen pick goes; {@link ScreenPicks#NONE} for a plugin with no capture path
      */
-    public static Node tuplePill(ValueContext ctx, TupleSpec spec) {
-        MenuButton pill = Pills.bare(tupleLabel(ctx, spec));
+    public static <T> Node tuplePill(ValueContext ctx, ComponentType<T> type, TupleSpec spec,
+                                     ScreenPicks picks) {
+        MenuButton pill = Pills.bare(tupleLabel(ctx, type, spec));
+        ScreenPicks picker = picks == null ? ScreenPicks.NONE : picks;
         Pills.onOpen(pill, () -> {
             List<javafx.scene.control.MenuItem> items = new ArrayList<>();
             if (spec.pick() != Pick.NONE) {
-                items.add(Pills.item(spec.pick().item(), () -> pickTuple(ctx, spec, pill)));
+                items.add(Pills.item(spec.pick().item(), () -> pickTuple(ctx, type, spec, pill, picker)));
                 items.add(Pills.separator());
             }
-            items.add(Pills.item("Edit values…", () -> Modals.numbers(ctx, spec.title(), spec.labels(),
-                    Slots.ints(ctx, spec.labels().length), picked -> {
-                        Slots.writeConstructor(ctx, spec.type(), picked);
-                        pill.setText(tupleLabel(ctx, spec));
+            items.add(Pills.item("Edit values…", () -> Modals.numbers(ctx, spec.title(),
+                    labels(type, spec), numbers(ctx, type), picked -> {
+                        write(ctx, type, picked);
+                        pill.setText(tupleLabel(ctx, type, spec));
                     })));
             return items;
         });
@@ -346,28 +356,65 @@ public final class Editors {
      * <p>Public because it is the one piece of a tuple editor that can be asserted with no JavaFX toolkit,
      * and it is the piece worth asserting: the number a user reads off the pill is read back out of what the
      * last pick wrote, and getting it wrong shows one coordinate while the bot runs another.
+     *
+     * <p>The three answers correspond exactly to the three states of {@link ValueContext#value}: nothing
+     * written, a value this type describes, and an expression it does not — {@code target.center()}, which
+     * is shown as written because rewriting it into {@code 0, 0} would be a lie about what the bot does.
      */
-    public static String tupleLabel(ValueContext ctx, TupleSpec spec) {
+    public static <T> String tupleLabel(ValueContext ctx, ComponentType<T> type, TupleSpec spec) {
         if (Slots.isEmpty(ctx)) return spec.placeholder();
-        int count = spec.labels().length;
-        return Slots.holdsNumbers(ctx, count)
-                ? spec.label().apply(Slots.ints(ctx, count))
-                : Slots.raw(ctx);
+        return ctx.value(type.type())
+                .map(value -> spec.label().apply(ints(type.components(value))))
+                .orElseGet(() -> Slots.raw(ctx));
     }
 
-    private static void pickTuple(ValueContext ctx, TupleSpec spec, MenuButton pill) {
+    /** The numbers currently in the value, or zeroes — the shape every geometry dialog opens on. */
+    private static <T> int[] numbers(ValueContext ctx, ComponentType<T> type) {
+        return ctx.value(type.type())
+                .map(value -> ints(type.components(value)))
+                .orElseGet(() -> new int[type.componentTypes().size()]);
+    }
+
+    /** {@code components} as whole numbers, anything that is not one as {@code 0}. */
+    private static int[] ints(List<Object> components) {
+        int[] out = new int[components.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = components.get(i) instanceof Number n ? (int) Math.round(n.doubleValue()) : 0;
+        }
+        return out;
+    }
+
+    /** {@code labels} padded or truncated to the type's own arity, which is the only arity there is. */
+    private static <T> String[] labels(ComponentType<T> type, TupleSpec spec) {
+        int arity = type.componentTypes().size();
+        String[] given = spec.labels() == null ? new String[0] : spec.labels();
+        if (given.length == arity) return given;
+        String[] out = new String[arity];
+        for (int i = 0; i < arity; i++) out[i] = i < given.length ? given[i] : "#" + (i + 1);
+        return out;
+    }
+
+    /** Builds a value out of {@code numbers} through the plugin's own type and writes it. */
+    private static <T> void write(ValueContext ctx, ComponentType<T> type, int... numbers) {
+        List<Object> components = new ArrayList<>(numbers.length);
+        for (int number : numbers) components.add(number);
+        ctx.set(type.build(components));
+    }
+
+    private static <T> void pickTuple(ValueContext ctx, ComponentType<T> type, TupleSpec spec,
+                                      MenuButton pill, ScreenPicks picks) {
         switch (spec.pick()) {
             case REGION -> picks.region(r -> {
-                Slots.writeConstructor(ctx, spec.type(), r.x(), r.y(), r.width(), r.height());
-                pill.setText(tupleLabel(ctx, spec));
+                write(ctx, type, r.x(), r.y(), r.width(), r.height());
+                pill.setText(tupleLabel(ctx, type, spec));
             });
             case MEASURE -> picks.region(r -> {
-                Slots.writeConstructor(ctx, spec.type(), r.width(), r.height());
-                pill.setText(tupleLabel(ctx, spec));
+                write(ctx, type, r.width(), r.height());
+                pill.setText(tupleLabel(ctx, type, spec));
             });
             case POINT -> picks.point(p -> {
-                Slots.writeConstructor(ctx, spec.type(), p.x(), p.y());
-                pill.setText(tupleLabel(ctx, spec));
+                write(ctx, type, p.x(), p.y());
+                pill.setText(tupleLabel(ctx, type, spec));
             });
             case NONE -> { }
         }
@@ -388,41 +435,25 @@ public final class Editors {
      * @param prompt the typed field's prompt — the place to say what a command is allowed to look like
      */
     public static Node program(ValueContext ctx, String prompt) {
-        MenuButton pill = Pills.bare(fileLabel(Slots.stringLiteral(Slots.raw(ctx))));
+        MenuButton pill = Pills.bare(fileLabel(Values.text(ctx, "")));
         Pills.onOpen(pill, () -> List.of(
                 Pills.item("Browse for program…", () -> Modals.program(ctx,
-                        parentOf(Slots.stringLiteral(Slots.raw(ctx))), path -> {
-                            Slots.writeText(ctx, path.toString());
+                        parentOf(Values.text(ctx, "")), path -> {
+                            ctx.set(path.toString());
                             pill.setText(fileLabel(path.toString()));
                         })),
                 Pills.separator(),
                 Pills.item("Enter path…", () -> {
-                    String now = Slots.stringLiteral(Slots.raw(ctx));
-                    TextField field = Fields.committing(now == null ? "" : now, prompt, null);
+                    TextField field = Fields.committing(Values.text(ctx, ""), prompt, null);
                     field.setPrefColumnCount(40);
                     Modals.form(ctx, "Program path", field, () -> {
                         String typed = field.getText() == null ? "" : field.getText().trim();
                         if (typed.isEmpty()) return;
-                        Slots.writeText(ctx, typed);
+                        ctx.set(typed);
                         pill.setText(fileLabel(typed));
                     });
                 })));
         return pill;
-    }
-
-    /**
-     * A text field over a value that may be a slot — {@link #text}'s counterpart on the {@link Slots} side.
-     *
-     * <p>{@code text} writes through {@code ctx.set}, which stores the characters themselves; this writes a
-     * Java string literal when the value is a slot in a bot's source, and the same characters when it is a
-     * Parameters row. An editor that might sit in source wants this one.
-     */
-    public static Node textSlot(ValueContext ctx, String prompt, int columns) {
-        String current = Slots.stringLiteral(Slots.raw(ctx));
-        TextField field = Fields.committing(current == null ? "" : current, prompt,
-                typed -> Slots.writeText(ctx, typed));
-        if (columns > 0) field.setPrefColumnCount(columns);
-        return field;
     }
 
     /** The folder a path sits in, for the chooser to open on; null when there is no usable path yet. */
@@ -447,44 +478,22 @@ public final class Editors {
     /** Writes the number the way a person would have typed it: a count as a count, a fraction as a decimal. */
     private static void commitRange(ValueContext ctx, NumberRange range, double value) {
         double clamped = Math.clamp(value, range.min(), range.max());
-        String literal = range.whole()
-                ? Long.toString(Math.round(clamped))
-                : BigDecimal.valueOf(clamped).setScale(3, RoundingMode.HALF_UP)
-                        .stripTrailingZeros().toPlainString();
-        Slots.write(ctx, literal, literal);
-    }
-
-    /**
-     * The number in the value, or the range's own default.
-     *
-     * <p>Falling back to the default rather than to zero matters: opening the editor on a slot holding a
-     * variable and pressing OK would otherwise write {@code 0}, which for a confidence means "match anything".
-     */
-    private static double rangeCurrent(ValueContext ctx, NumberRange range) {
-        try {
-            String raw = Slots.raw(ctx).replace("_", "").replaceAll("[lLdDfF]$", "");
-            return raw.isBlank() ? range.fallback() : Double.parseDouble(raw);
-        } catch (NumberFormatException e) {
-            return range.fallback();
-        }
+        Values.setNumber(ctx, range.whole()
+                ? Math.round(clamped)
+                : BigDecimal.valueOf(clamped).setScale(3, RoundingMode.HALF_UP).doubleValue());
     }
 
     /** What the pill says: the value as written, plus the unit — or the source text when it is not a number. */
     private static String rangeLabel(ValueContext ctx, NumberRange range) {
+        if (Slots.isEmpty(ctx)) return range.label() + "…";
         String raw = Slots.raw(ctx);
-        if (raw.isBlank()) return range.label() + "…";
-        try {
-            Double.parseDouble(raw.replace("_", "").replaceAll("[lLdDfF]$", ""));
-            return raw + range.unit();
-        } catch (NumberFormatException e) {
-            return raw;
-        }
+        double held = Values.number(ctx, Double.NaN);
+        if (Double.isNaN(held)) return raw;
+        return (range.whole() ? Long.toString(Math.round(held)) : trim(held)) + range.unit();
     }
 
-    /** A whole number reads as one — {@code "3"}, not {@code "3.0"} — because that is what a bot's source wants. */
+    /** A whole number reads as one — {@code "3"}, not {@code "3.0"} — because that is what a person reads. */
     private static String trim(double value) {
-        return value == Math.rint(value)
-                ? Long.toString(Math.round(value))
-                : Double.toString(value);
+        return value == Math.rint(value) ? Long.toString(Math.round(value)) : Double.toString(value);
     }
 }

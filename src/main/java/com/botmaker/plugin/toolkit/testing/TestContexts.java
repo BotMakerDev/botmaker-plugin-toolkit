@@ -5,8 +5,6 @@ import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.value.ValueForm;
-import com.botmaker.plugin.api.value.ValueType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +40,11 @@ import java.util.Optional;
 public final class TestContexts {
 
     private TestContexts() {}
+
+    /** The eight primitive spellings, taken off the class literals so nothing here is typed out. */
+    private static final java.util.Set<String> PRIMITIVES = java.util.Set.of(
+            boolean.class.getName(), byte.class.getName(), char.class.getName(), short.class.getName(),
+            int.class.getName(), long.class.getName(), float.class.getName(), double.class.getName());
 
     /**
      * A value with a type and no call behind it — a Parameters row, or a {@code @Managed} method's value.
@@ -91,6 +94,7 @@ public final class TestContexts {
         private final int argIndex;
 
         private String source;
+        private Object value;
         private final List<String> imports = new ArrayList<>();
         private String enclosingReplacement;
         private String enclosingSource;
@@ -118,6 +122,21 @@ public final class TestContexts {
          */
         public Recording withType(String typeName) {
             this.typeName = typeName == null ? "" : typeName;
+            return this;
+        }
+
+        /**
+         * The value {@link ValueContext#value(Class)} answers — the decoded {@code Duration}, {@code Point}
+         * or {@code String} the host would have handed the editor.
+         *
+         * <p><b>It is set, never derived.</b> This module owns no grammar and reads no Java: turning
+         * {@code "Duration.ofSeconds(3)"} into a {@code Duration} is the host's job, and a stub that
+         * guessed at it would be a second reader of the one thing the 2026-09-22 change exists to have
+         * exactly one of. Leaving it unset is the case an editor must handle first — an expression nothing
+         * can decode, which is shown read-only.
+         */
+        public Recording withValue(Object value) {
+            this.value = value;
             return this;
         }
 
@@ -152,9 +171,17 @@ public final class TestContexts {
             return runReplacement;
         }
 
-        /** The Java expression the value now holds — what {@link #set} was last given, or the initial one. */
+        /**
+         * The Java expression the value now holds — what {@link #set(String, Class...)} was last given, or
+         * the initial one.
+         */
         public String written() {
             return source;
+        }
+
+        /** The value the editor last wrote through {@link #set(Object)}, or what {@link #withValue} seeded. */
+        public Object value() {
+            return value;
         }
 
         /** The imports the last {@link #set} asked for. */
@@ -189,18 +216,32 @@ public final class TestContexts {
 
                 @Override
                 public String qualifiedName() {
-                    return typeName.indexOf('.') < 0 ? "" : typeName;
+                    // A primitive IS its own qualified name, which "has it got a dot in it" reads as
+                    // unresolved — and a widget asking TypeRef.is(int.class) then never matches an `int`
+                    // field. The names come off the class literals rather than being typed, so a fourth
+                    // hand-rolled keyword list is not created here.
+                    return typeName.indexOf('.') >= 0 || PRIMITIVES.contains(typeName) ? typeName : "";
                 }
             };
         }
 
+        /** What {@link #withValue} seeded, when it is of the type asked for. Empty otherwise. */
+        @Override
+        public <T> Optional<T> value(Class<T> type) {
+            return type != null && type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
+        }
+
         /**
-         * A leaf of the declared type — enough for an editor that matches on a type, which is nearly all of
-         * them. An editor claiming a composite is tested against a form it builds itself.
+         * Records the value instead of writing it, and leaves {@link #written()} alone.
+         *
+         * <p>The host would spell it here, through the owning plugin's {@code ComponentType}. This stub
+         * cannot and does not pretend to — assert on {@link #value()}, which is what the editor actually
+         * decided, rather than on a spelling this module would have had to invent.
          */
         @Override
-        public ValueForm form() {
-            return ValueForm.of(ValueType.of(typeName.isEmpty() ? "?" : typeName).source(typeName).build());
+        public void set(Object newValue) {
+            this.value = newValue;
+            writes++;
         }
 
         @Override
@@ -209,10 +250,14 @@ public final class TestContexts {
         }
 
         @Override
-        public void set(String javaExpression, String... importsNeeded) {
+        public void set(String javaExpression, Class<?>... importsNeeded) {
             this.source = javaExpression == null ? "" : javaExpression;
             this.imports.clear();
-            if (importsNeeded != null) this.imports.addAll(List.of(importsNeeded));
+            if (importsNeeded != null) {
+                for (Class<?> needed : importsNeeded) {
+                    if (needed != null) this.imports.add(com.botmaker.plugin.toolkit.Source.type(needed));
+                }
+            }
             writes++;
         }
 

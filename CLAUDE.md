@@ -44,9 +44,9 @@ must be a *widget or a shape*, useful to a plugin that has no vocabulary of its 
 mean anything, it belongs to the plugin that owns them.
 
 **And the rule on the SDK's side is unchanged, with its exception moved house**: *only the SDK's plugin half
-(`plugin/`, `internal/plugin/`) may name a toolkit **widget***. `internal/config/SdkGrammar` and
-`api/config/Settings` are library-half classes, and what they name is another plugin's API
-(`com.botmaker.plugin.basics.store`) rather than anything here.
+(`plugin/`, `internal/plugin/`) may name a toolkit **widget***. `api/config/Settings` is a library-half
+class, and what it names is another plugin's API (`com.botmaker.plugin.basics.store`) rather than anything
+here.
 
 **It is the PLUGIN's dependency and never the host's — `botmaker-studio` must not list it.** That rule
 stood, was struck on 2026-08-28, and was restored on 2026-09-02. The round trip is worth carrying, because
@@ -83,23 +83,29 @@ test now that the way to break the rule is to add the dependency back rather tha
 
 ## What is in here, after the 2026-08-28 lift
 
-Seven widget classes (`Editors`, `Pills`, `Fields`, `Modals`, `Values`, `Styles`, `Thumbnail`) and, since
-the lift out of the SDK, five more that are not widgets at all:
+Seven widget classes (`Editors`, `Pills`, `Fields`, `Modals`, `Values`, `Styles`, `Thumbnail`) and five
+more that are not widgets at all:
 
 | class | what it is | why it is here and not in a plugin |
 |---|---|---|
-| `Slots` | reads and writes a value that is Java source in a slot and stored text in a Parameters row | not a line of it named an SDK type; **every** editor that can sit in source needs it |
-| `CallSites` | the four matcher shapes for an editor chosen by the call around a value, not by its type | the matching is generic; the class and method **names** are the plugin's and stay there |
-| `Codecs` | `ValueCodec`s from lambdas, plus `or` (total) and `seeded` | four one-line answers should not cost fourteen lines of anonymous class per type; there is no three-argument `of`, because the reader it defaulted away is how eight of seventeen types became write-only |
-| `AbstractStudioPlugin` | the four contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
+| `Slots` | the value as it is **written**, for an expression nothing can decode | two methods since 2026-09-22; see *No plugin parses anything* below |
+| `AbstractStudioPlugin` | the contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
+| `AbstractPluginType` | a `PluginType` that holds its own `Class` and reads components back without a cast per line | `build(List<Object>)` is the one place a declaration trusts what it is handed; a helper makes a wrong index a clearer failure than a `ClassCastException` on an unrelated line |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
+
+**`CallSites` and `Codecs` were here and are deleted (2026-09-22).** `CallSites` is
+`SlotEditor.forCall`/`forType` on the contract — 116 lines of `Predicate<ValueContext>` construction with no
+JavaFX in it, and *which slot an editor claims* is contract vocabulary, the same argument that put
+`SlotEditor.of` there. `Codecs` went with `ValueCodec`: its `ofEnum`, `or` and `seeded` had **zero callers
+anywhere in the repository**, and the four string methods they built stopped being read when storage stopped
+being text.
 
 **`TestContexts` gained `withRun` on 2026-08-31**, for the contract's new `SlotRun`. It records what an
 editor writes to a run *and enforces `minimum()` exactly as the host does* — a `replace` with too few
 elements leaves the elements alone and counts no write — so a test can assert that an editor honours the
 floor rather than trusting it. `run()` answers `null` without it, which is what nearly every real slot
 answers and therefore the case an editor must handle first. `SlotRunTest` holds those cases.
-| `Source` (2026-08-28) | Java source: a string literal, a char, a number, an enum constant, a constructor | a plugin emits Java whether it means to or not — `ValueCodec.literal` and every slot write — and this project already had three hand-rolled escapers, each of which stopped at the backslash and the quote |
+| `Source` (2026-08-28) | three members: a string literal, a type's name, a method-name check | a recorded macro is Java a **user pastes**, so it has no type for the host to spell it from; and this project already had three hand-rolled escapers, each of which stopped at the backslash and the quote |
 | `ZoomPan` (2026-08-30) | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a `Pane` and a content `Group` | it names no capture target, no colour and nothing of any plugin's API — it is a gesture, which is the definition of a shape. Written in Studio, held in the SDK for two slices because Studio source may not name a toolkit type, and moved the moment both its callers were the SDK's |
 
 **`Styles.UNTHEMED` arrived with `ZoomPan` and is the first style class here that is an *opt-out*.** The host
@@ -125,13 +131,16 @@ options are a `Supplier` read when the list opens (a set that moves — `gallery
 state, and an editor that could only pick from what exists would make it unsayable. Its one caller today is
 the SDK's activity/outcome pair, and the vocabulary — *which* names, and the prompts — stayed there.
 
-`program(ctx, prompt)` is browse-or-type for an executable and
-`textSlot(ctx, prompt, columns)` is `text` on the `Slots` side — the SDK's `LaunchEditors` keeps `game()`,
-its cover art, and the two prompts, which are the only sentences in it that know what a launch call is.
+`program(ctx, prompt)` is browse-or-type for an executable, and `text(ctx, prompt, columns)` is the field —
+the SDK's `LaunchEditors` keeps `game()`, its cover art, and the two prompts, which are the only sentences
+in it that know what a launch call is.
 
-**One thing that looks liftable and is not: the SDK's own `SdkValueTypes` still uses its private
-`codec(…)`/`seeded(…)` helpers rather than `Codecs`, and `LiteralWriter` keeps its own escaping rather than
-`Source`.** Not an oversight. The crash argument for it came and went — Studio carried no toolkit, then
+**The `text`/`textSlot` and `choice`/`choiceSlot` pairs collapsed to one each on 2026-09-22.** They existed
+because one half wrote the characters and the other wrote a Java string literal — two encodings of one
+value, which is the thing that change exists to remove.
+
+**One thing that looks liftable and is not: the SDK's `LiteralWriter` keeps its own escaping rather than
+using `Source`.** Not an oversight. The crash argument for it came and went — Studio carried no toolkit, then
 briefly did (2026-08-28 to 2026-09-02), and does not again — but the conclusion never depended on it:
 **the SDK is a library *and* a plugin, and only its plugin half (`plugin/`, `internal/plugin/`) may name
 us.** A library half that reached for a plugin's widget kit would be unusable in every host that does not
@@ -148,10 +157,23 @@ copy carries a comment saying so.
 the project's paths, and it is the only door. A widget that needs something not on `StudioServices` is
 telling you the *contract* is missing something — say so, do not route around it.
 
-**2. Nothing throws while building a node.** A value is a `List<String>` that a user may have typed anything
-into, or that a newer version of the plugin wrote. `Values` degrades in every case, on purpose. An editor
+**2. Nothing throws while building a node.** `ValueContext.value` answers **empty** for anything the host's
+grammar could not decode — a variable, a computed initializer, `target.center()` — and that is a normal
+state, not a failure path. `Values` degrades to the caller's fallback in every case, on purpose. An editor
 that throws in its constructor leaves a row of the Parameters window with no widget in it and no explanation
 — which reads as the host being broken.
+
+**2b. No plugin parses anything (2026-09-22).** There is no `Slots.arguments`, no `Slots.ints`, no
+`Slots.stringLiteral` and no `Slots.holdsNumbers`. Those existed because `ValueContext` handed over a
+`String` of Java, so every editor parsed it — which produced three numeric-literal strippers, two argument
+splitters and one string unescaper across two modules, none agreeing with the host's. Read the value with
+`ValueContext.value(Class)` and write one with `set(Object)`. `Slots.raw` survives for exactly one purpose:
+**showing** an expression `value()` could not decode, so the user sees what is in their file.
+
+*`holdsNumbers` is deliberately not reimplemented.* "Is this value numbers at all, or is it
+`target.center()`" is exactly "did `value()` answer", asked by the thing that knows — and the old one
+required `startsWith("new ")`, so `Point.of(1, 2)` read as not-numbers while `new Point(a, b)` labelled a
+pair of variables `0, 0`.
 
 **3. Building an editor never writes.** Not even to normalise what is already there. A project opened and
 closed must come back byte-identical, and a widget that "tidies" a value on render rewrites every bot the
@@ -167,19 +189,30 @@ stayed in the SDK. `Editors.NumberRange` passes because a *bounded number* is a 
 This is the acceptance test for every lift out of a plugin, and it is what stops this module becoming the
 SDK's second home. A widget that is generic only because its one caller happens to be generic is not generic.
 
-## The one dependency, and why the bar was met
+## No dependency at all, and how it got back there
 
-`botmaker-studio-api` and `javafx-controls` are `provided` — a plugin has both already. **The only
-dependency a plugin actually resolves through this module is JavaPoet**
-(`com.palantir.javapoet:javapoet`, one 106 KB jar with none of its own), added 2026-08-28 for `Source`.
+`botmaker-studio-api` and `javafx-controls` are `provided` — a plugin has both already — and since
+2026-09-22 **there is nothing else**. `mvn dependency:tree` shows no `compile` entry: a plugin author cannot
+get a version conflict out of this module.
 
-The bar it had to clear is the one this section has always stated: *it becomes every plugin's dependency,
-and its compatibility becomes ours.* What cleared it is that **a plugin writes Java whether it means to or
-not** — `ValueCodec.literal` returns Java source and `Slots.write` writes an expression into a bot's file —
-so the choice was never "a dependency or nothing", it was "one implementation or a hand-rolled escaper per
-plugin". This project had already written three of those (here, in the SDK, and in the generated skeleton),
-and each of them escaped the backslash and the quote and stopped, so a pasted tab produced a slot that would
-not compile.
+**JavaPoet was here from 2026-08-28 to 2026-09-22**, and it was the only dependency a plugin ever resolved
+through this module. The bar it had to clear is the one this section has always stated: *it becomes every
+plugin's dependency, and its compatibility becomes ours.* What cleared it at the time was that **a plugin
+wrote Java whether it meant to or not** — `ValueCodec.literal` returned Java source and `Slots.write` wrote
+an expression into a bot's file — so the choice was never "a dependency or nothing", it was "one
+implementation or a hand-rolled escaper per plugin".
+
+**What removed it is that the premise stopped being true.** A value crosses as a value now and the host
+spells it, through the plugin's own `ComponentType`. What was left of `Source` used JavaPoet for two things:
+`CodeBlock` joining a constructor's arguments, which lost its last caller, and `ClassName.get(Class)`
+spelling a nested type `Outer.Inner` rather than `Outer$Inner` — which is `Class.getCanonicalName()`, and is
+what `ClassName.get` reads too.
+
+**The escaping argument survives intact and is why `Source.string` stays.** The SDK's macro translator turns
+a recording into *statements a user pastes*, which is not a value and has no type, so the host cannot spell
+it. Three hand-rolled escapers existed before that method (here, in the SDK, and in the generated skeleton)
+and each escaped the backslash and the quote and stopped, so a pasted tab produced a slot that would not
+compile.
 
 **`Source.call` was deleted on 2026-09-04, and the reason is the rule to apply to the next member proposed
 here.** It composed `Type.method(a, b)` and checked the method name reflectively, and it had **no production
@@ -195,12 +228,11 @@ parameter count — precisely the `MemberRef` + `M0`–`M5` apparatus built for 
 2026-08-27, and a method reference still cannot name a specific overload. There is no arity-free form. Both
 `Source`'s javadoc and this paragraph say so, because the idea is a good one and will be had again.
 
-**`Source.string` is the one member JavaPoet does not implement**, and that is pinned by a test rather than
-left to be rediscovered: `$S` splits a string containing a newline into a concatenation *across source
-lines*, which is right for a generated file and wrong for a slot, where the host writes the result into the
-middle of an existing line. The structural members (`newInstance`, `call`, `type`) are JavaPoet's, and
-**no JavaPoet type appears in a signature here** — so a plugin's own compile is unaffected by which library
-is behind it, and the library can be replaced without breaking anybody.
+**`Source.string` is the one member JavaPoet never implemented correctly for this use**, and that is pinned
+by a test rather than left to be rediscovered: `$S` splits a string containing a newline into a
+concatenation *across source lines*, which is right for a generated file and wrong here, where the result
+goes into the middle of an existing line. **No JavaPoet type ever appeared in a signature here**, which is
+what made removing the library a non-event for every plugin compiled against it.
 
 ControlsFX was considered and declined on the same bar and did not clear it: `PropertySheet` is a whole-form
 abstraction and these are bespoke single-value nodes, so it would sit unused beside them while every plugin
@@ -230,8 +262,9 @@ mistake it exists to prevent — that a bare `TextField` loses edits made by cli
 ## Building
 
 ```bash
-mvn test        # ValuesTest, CallSitesTest, SourceTest, SlotRunTest, TupleLabelTest (52) — what is
-                # assertable with no JavaFX toolkit
+mvn test        # ValuesTest, SourceTest, SlotRunTest, TupleLabelTest (28) — what is assertable with
+                # no JavaFX toolkit
+mvn dependency:tree   # nothing at `compile`: the property to keep
 mvn install     # com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
 ```
 

@@ -1,78 +1,82 @@
 package com.botmaker.plugin.toolkit;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.botmaker.plugin.api.slot.TypeRef;
+import com.botmaker.plugin.api.slot.ValueContext;
 
 /**
- * Reading and writing the {@code List<String>} a {@link com.botmaker.plugin.api.slot.ValueContext} carries.
+ * Reading and writing the value a {@link ValueContext} carries, for the handful of JDK types a widget deals
+ * in directly.
  *
- * <p>The contract is deliberate that a value is a list of strings — that is what a project file holds — and
- * equally deliberate that <em>parsing it is the editor's own job, and failing to parse it is normal</em>: a
- * user may have typed anything, and a value may have been written by a newer version of the plugin than the
- * one now reading it. Every method here therefore <b>degrades and never throws</b>. That is not politeness;
- * an editor that throws while building its node leaves a row of the Parameters window with no widget in it.
+ * <p>{@link ValueContext#value(Class)} already answers the typed value, so nothing here parses anything —
+ * which is the whole difference from what this class was. Until 2026-09-22 it read a {@code List<String>}
+ * off the context and turned strings into numbers, and its javadoc pointed at a method the contract had
+ * deleted two days earlier.
  *
- * <p>The one thing to keep in mind: {@code ""} and "absent" are the same here. An editor that needs to tell
- * <em>never set</em> from <em>deliberately cleared</em> has to look at {@link
- * com.botmaker.plugin.api.slot.ValueContext#value()} itself, because a one-element list holding {@code ""} and an
- * empty list both read as blank through these.
+ * <p>What is left is the part a widget genuinely cannot do for itself: <b>a number's Java type is not the
+ * number</b>. A slider works in {@code double}, and writing one back into a field declared {@code int} has
+ * to write an {@code Integer} or the host writes {@code 3.0} where {@code 3} was asked for. That is
+ * {@link #setNumber}, and it is the one place the declared type is consulted.
+ *
+ * <p><b>Nothing here throws.</b> A value may have been typed by hand, or written by a newer version of the
+ * plugin now reading it; every read degrades to the fallback the caller named. An editor that throws while
+ * building its node leaves a row of the Parameters window with no widget in it.
  */
 public final class Values {
 
     private Values() {}
 
-    /** The item at {@code index}, or {@code ""} — never null, whatever the list holds. */
-    public static String at(List<String> value, int index) {
-        if (value == null || index < 0 || index >= value.size()) return "";
-        String item = value.get(index);
-        return item == null ? "" : item;
+    /** The value as text, or {@code fallback} — for a slot whose expression is not a plain string. */
+    public static String text(ValueContext ctx, String fallback) {
+        return ctx == null ? fallback : ctx.value(String.class).orElse(fallback);
     }
 
-    /** The item at {@code index} as an {@code int}, or {@code fallback} if it is missing or not a number. */
-    public static int intAt(List<String> value, int index, int fallback) {
-        try {
-            return Integer.parseInt(at(value, index).trim());
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
-    }
-
-    /** The item at {@code index} as a {@code double}, or {@code fallback} if it is missing or not a number. */
-    public static double doubleAt(List<String> value, int index, double fallback) {
-        try {
-            return Double.parseDouble(at(value, index).trim());
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
+    /** The value as a yes/no, or {@code fallback}. */
+    public static boolean flag(ValueContext ctx, boolean fallback) {
+        return ctx == null ? fallback : ctx.value(Boolean.class).orElse(fallback);
     }
 
     /**
-     * The first {@code count} items as {@code int}s, missing or unparsable ones as {@code 0}.
+     * The value as a number whatever numeric type it is declared as, or {@code fallback}.
      *
-     * <p>The shape every geometry editor wants: a {@code Rect} is four of these and a {@code Point} is two,
-     * and a half-written value must still open an editor rather than refuse to render.
+     * <p>Falling back to the caller's number rather than to zero matters: opening an editor on a slot
+     * holding a variable and pressing OK would otherwise write {@code 0}, which for a confidence means
+     * "match anything".
      */
-    public static int[] ints(List<String> value, int count) {
-        int[] out = new int[Math.max(count, 0)];
-        for (int i = 0; i < out.length; i++) out[i] = intAt(value, i, 0);
-        return out;
-    }
-
-    /** {@code numbers} as the wire form, ready for {@link com.botmaker.plugin.api.slot.ValueContext#set(List)}. */
-    public static List<String> of(int... numbers) {
-        if (numbers == null) return List.of();
-        List<String> out = new ArrayList<>(numbers.length);
-        for (int n : numbers) out.add(Integer.toString(n));
-        return List.copyOf(out);
-    }
-
-    /** Whether every item is missing or whitespace — the state a placeholder is shown for. */
-    public static boolean isBlank(List<String> value) {
-        if (value == null || value.isEmpty()) return true;
-        for (String item : value) {
-            if (item != null && !item.isBlank()) return false;
+    public static double number(ValueContext ctx, double fallback) {
+        if (ctx == null) return fallback;
+        // The boxes, not Number.class: a value is asked for by the exact type it was written as, so asking
+        // for a supertype would need the host to decide what "assignable" means across two classloaders —
+        // the comparison rule 2 exists to keep out. Six empty answers cost nothing.
+        for (Class<? extends Number> box : BOXES) {
+            java.util.Optional<? extends Number> held = ctx.value(box);
+            if (held.isPresent()) return held.get().doubleValue();
         }
-        return true;
+        return fallback;
+    }
+
+    private static final java.util.List<Class<? extends Number>> BOXES = java.util.List.of(
+            Integer.class, Long.class, Double.class, Float.class, Short.class, Byte.class);
+
+    /**
+     * Writes {@code value} as the numeric type this slot is declared as.
+     *
+     * <p>A widget works in {@code double} and a field is declared {@code int}, {@code long} or
+     * {@code double}, and only the declaration says which. Writing the wrong one puts {@code 3.0} into a
+     * pixel count, or truncates a confidence to {@code 0}.
+     *
+     * <p>An unresolved or non-numeric type is written as a {@code double}, which is the reading that keeps
+     * the most information. Nothing here rounds silently in the other direction: a whole type rounds to
+     * nearest, so a slider at 2.5 on an {@code int} field writes 3 rather than 2.
+     */
+    public static void setNumber(ValueContext ctx, double value) {
+        if (ctx == null) return;
+        TypeRef type = ctx.type();
+        if (type.is(int.class) || type.is(Integer.class)) ctx.set((int) Math.round(value));
+        else if (type.is(long.class) || type.is(Long.class)) ctx.set(Math.round(value));
+        else if (type.is(float.class) || type.is(Float.class)) ctx.set((float) value);
+        else if (type.is(short.class) || type.is(Short.class)) ctx.set((short) Math.round(value));
+        else if (type.is(byte.class) || type.is(Byte.class)) ctx.set((byte) Math.round(value));
+        else ctx.set(value);
     }
 
     /**

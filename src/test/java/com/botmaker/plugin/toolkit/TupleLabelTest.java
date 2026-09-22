@@ -1,109 +1,80 @@
 package com.botmaker.plugin.toolkit;
 
-import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.toolkit.Editors.Pick;
-import com.botmaker.plugin.toolkit.Editors.TupleSpec;
+import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
-import org.junit.jupiter.api.DisplayNameGeneration;
-import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What {@link Editors#tupleLabel} puts on a collapsed pill, and the {@link Slots#holdsNumbers} check under
- * it.
+ * What a tuple pill says — the one piece of a geometry editor assertable with no JavaFX toolkit, and the
+ * piece worth asserting: the number a user reads off the pill is what the last pick wrote, and getting it
+ * wrong shows one coordinate while the bot runs another.
  *
- * <p>Both arrived here on 2026-08-28 out of the SDK's {@code GeometryEditors}, whose own
- * {@code GeometryLabelTest} keeps asserting the same round trip through the three specs it still owns. This
- * is the half that belongs to the <em>shape</em>: a spec's formatter is reached exactly when the value is
- * numbers, and never otherwise.
+ * <p>The three answers are exactly the three states of {@code ValueContext.value}: nothing written, a
+ * value this type describes, and an expression it does not.
  *
- * <p>No JavaFX toolkit is needed to ask any of it, which is the reason the label is a separate method rather
- * than something only reachable by building the pill.
+ * <p><b>The third is the one this replaced a worse test for.</b> The old label asked
+ * {@code Slots.holdsNumbers}, which required the source to start with {@code "new "} — so
+ * {@code Point.of(1, 2)} read as not-numbers and showed raw source for a value it could have labelled,
+ * while {@code new Point(a, b)} read as numbers and labelled a pair of variables {@code 0, 0}. The
+ * question is "did the grammar decode this", and the grammar is the one that answers it now.
  */
-@DisplayNameGeneration(ReplaceUnderscores.class)
 class TupleLabelTest {
 
-    /** A stand-in for the SDK's {@code Rect}: four numbers, an origin and a size. */
-    private record Box(int x, int y, int width, int height) {}
+    record Rect(int x, int y, int width, int height) {}
 
-    private static final TupleSpec SPEC = new TupleSpec(Box.class, "Box",
-            new String[]{"x", "y", "width", "height"}, "Choose box…", Pick.REGION,
-            v -> v[0] + ", " + v[1] + "  " + v[2] + "×" + v[3]);
+    static final ComponentType<Rect> RECT = new ComponentType<>() {
+        @Override public Class<Rect> type() { return Rect.class; }
+        @Override public List<Class<?>> componentTypes() {
+            return List.of(int.class, int.class, int.class, int.class);
+        }
+        @Override public List<Object> components(Rect r) {
+            return List.of(r.x(), r.y(), r.width(), r.height());
+        }
+        @Override public Rect build(List<Object> parts) {
+            return new Rect((int) parts.get(0), (int) parts.get(1), (int) parts.get(2), (int) parts.get(3));
+        }
+    };
 
-    private static final TupleSpec PAIR = new TupleSpec(Box.class, "Pair",
-            new String[]{"a", "b"}, "Choose pair…", Pick.NONE, v -> v[0] + " × " + v[1]);
+    static final Editors.TupleSpec SPEC = new Editors.TupleSpec("Region",
+            new String[] {"X", "Y", "Width", "Height"}, "Choose region…", Editors.Pick.REGION,
+            n -> n[0] + ", " + n[1] + "  " + n[2] + "×" + n[3]);
 
-    private static String label(String source) {
-        return Editors.tupleLabel(TestContexts.typedSlot("", source), SPEC);
+    @Test
+    void anEmptySlotReadsAsItsPlaceholder() {
+        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot("Rect", ""), RECT, SPEC));
+        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot("Rect", "  "), RECT, SPEC));
     }
 
     @Test
-    void a_constructor_is_read_back_through_the_spec_formatter() {
-        assertEquals("10, 20  640×480", label("new Box(10, 20, 640, 480)"));
-    }
+    void aValueTheTypeDescribesIsLabelledTheWayThePluginSpellsIt() {
+        var slot = TestContexts.typedSlot("Rect", "new Rect(10, 20, 640, 480)")
+                .withValue(new Rect(10, 20, 640, 480));
 
-    @Test
-    void an_empty_slot_shows_the_placeholder_rather_than_zeroes() {
-        assertEquals("Choose box…", label("   "));
-    }
-
-    /** A half-written constructor is what a freshly inserted block looks like before the user picks. */
-    @Test
-    void a_missing_argument_reads_as_zero() {
-        assertEquals("10, 20  0×0", label("new Box(10, 20)"));
+        assertEquals("10, 20  640×480", Editors.tupleLabel(slot, RECT, SPEC));
     }
 
     /**
-     * The formatter is not reached at all for an expression that is not a construction. Rewriting somebody's
-     * {@code target.bounds()} into "0, 0  0×0" would claim a value they never set.
+     * An expression the grammar could not read shows as written, because rewriting {@code target.bounds()}
+     * into {@code 0, 0  0×0} is a lie about what the bot does.
      */
     @Test
-    void a_non_constructor_expression_is_shown_verbatim() {
-        assertEquals("bounds", label("bounds"));
-        assertEquals("target.bounds()", label("target.bounds()"));
-        assertEquals("new Box(abc, 2, 3, 4)", label("new Box(abc, 2, 3, 4)"));
+    void anExpressionTheGrammarCannotReadIsShownAsWritten() {
+        assertEquals("target.bounds()",
+                Editors.tupleLabel(TestContexts.typedSlot("Rect", "target.bounds()"), RECT, SPEC));
+        assertEquals("BOUNDS",
+                Editors.tupleLabel(TestContexts.typedSlot("Rect", "BOUNDS"), RECT, SPEC));
     }
 
+    /** A spelling that is not a constructor is no longer a reason to refuse a label. */
     @Test
-    void a_spec_with_fewer_numbers_reads_only_those() {
-        assertEquals("1 × 2", Editors.tupleLabel(TestContexts.typedSlot("", "new Box(1, 2, 3)"), PAIR));
-    }
+    void aFactoryCallLabelsJustAsAConstructorDoes() {
+        var factory = TestContexts.typedSlot("Rect", "Rect.of(1, 2, 3, 4)")
+                .withValue(new Rect(1, 2, 3, 4));
 
-    /** A value with no call site — a Parameters row, a {@code @Managed} method — reads the same way. */
-    @Test
-    void a_value_with_no_call_site_is_labelled_the_same_way() {
-        ValueContext row = TestContexts.row("", "new Box(10, 20, 640, 480)");
-        assertEquals("10, 20  640×480", Editors.tupleLabel(row, SPEC));
-        assertEquals("Choose box…", Editors.tupleLabel(TestContexts.row("", ""), SPEC));
-    }
-
-    @Test
-    void a_value_holding_something_that_is_not_a_number_is_shown_verbatim() {
-        assertEquals("target.center()",
-                Editors.tupleLabel(TestContexts.row("", "target.center()"), SPEC));
-    }
-
-    // --- The check itself ---
-
-    @Test
-    void java_integer_literals_count_as_numbers() {
-        assertTrue(Slots.holdsNumbers(TestContexts.typedSlot("", "new Box(100L, 1_000, -3, +4)"), 4));
-    }
-
-    @Test
-    void a_value_that_is_not_a_constructor_call_does_not_hold_numbers() {
-        assertFalse(Slots.holdsNumbers(TestContexts.row("", "target.bounds()"), 4));
-    }
-
-    /** Building a label must never write — the toolkit's rule that opening a project changes nothing. */
-    @Test
-    void labelling_writes_nothing() {
-        TestContexts.Recording ctx = TestContexts.typedSlot("", "new Box(1, 2, 3, 4)");
-        Editors.tupleLabel(ctx, SPEC);
-        assertEquals(0, ctx.writes());
+        assertEquals("1, 2  3×4", Editors.tupleLabel(factory, RECT, SPEC));
     }
 }

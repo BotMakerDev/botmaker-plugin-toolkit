@@ -3,7 +3,7 @@ package com.botmaker.plugin.toolkit;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
-import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.api.value.PluginType;
 
 import java.util.List;
 
@@ -14,8 +14,8 @@ import java.util.List;
  * public final class DiscordPlugin extends AbstractStudioPlugin {
  *     public DiscordPlugin() { super("com.example.discord", "Discord"); }
  *
- *     @Override protected PaletteCatalog buildCatalog()      { return PaletteCatalog.of(Discord.class); }
- *     @Override protected ValueCatalog   buildValueTypes()   { return DiscordTypes.CATALOG; }
+ *     @Override protected PaletteCatalog buildCatalog()       { return PaletteCatalog.of(Discord.class); }
+ *     @Override protected List<PluginType<?>> buildTypes()    { return DiscordTypes.ALL; }
  *     @Override protected List<SlotEditor> buildSlotEditors() { return DiscordEditors.ALL; }
  * }
  * }</pre>
@@ -37,11 +37,14 @@ import java.util.List;
  *
  * <h2>What it deliberately does not do</h2>
  *
- * <p><b>Nothing here is {@code final}.</b> In particular {@link #catalog(String)} is memoised ignoring its
- * argument, which is right for a plugin whose palette does not vary by pinned version — most of them — and
- * wrong for one that ships per-version curation. That plugin overrides {@code catalog(String)} directly and
- * this class gets out of the way. A base class that narrowed the contract to fit the common case would be
- * doing to plugins exactly what the platform exists to stop the host doing to them.
+ * <p><b>Nothing here is {@code final}.</b> A plugin whose palette or type list genuinely has to be rebuilt
+ * per call overrides the contract method directly and this class gets out of the way. A base class that
+ * narrowed the contract to fit the common case would be doing to plugins exactly what the platform exists
+ * to stop the host doing to them.
+ *
+ * <p>{@code catalog} took the project's pinned version of this plugin until 2026-09-22 and this class
+ * memoised ignoring it — which was the measurement that deleted the argument: no implementation anywhere
+ * read it.
  *
  * <p>It also holds no state beyond the three cached answers and takes no services: a plugin is constructed
  * before the host has a project open, so there is nothing to hand it yet. Everything context-dependent
@@ -53,7 +56,7 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     private final String displayName;
 
     private volatile PaletteCatalog catalog;
-    private volatile ValueCatalog valueTypes;
+    private volatile List<PluginType<?>> types;
     private volatile List<SlotEditor> slotEditors;
 
     /** A plugin whose display name is its id. */
@@ -71,9 +74,9 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
         return PaletteCatalog.empty();
     }
 
-    /** The value types this plugin registers. Called at most once. */
-    protected ValueCatalog buildValueTypes() {
-        return ValueCatalog.empty();
+    /** The types this plugin declares, in the order a picker should offer them. Called at most once. */
+    protected List<PluginType<?>> buildTypes() {
+        return List.of();
     }
 
     /**
@@ -101,7 +104,7 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     }
 
     @Override
-    public PaletteCatalog catalog(String pinnedVersion) {
+    public PaletteCatalog catalog() {
         PaletteCatalog local = catalog;
         if (local == null) {
             local = buildCatalog();
@@ -112,12 +115,12 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     }
 
     @Override
-    public ValueCatalog valueTypes() {
-        ValueCatalog local = valueTypes;
+    public List<PluginType<?>> types() {
+        List<PluginType<?>> local = types;
         if (local == null) {
-            local = buildValueTypes();
-            if (local == null) local = ValueCatalog.empty();
-            valueTypes = local;
+            List<PluginType<?>> built = buildTypes();
+            local = built == null ? List.of() : List.copyOf(built);
+            types = local;
         }
         return local;
     }

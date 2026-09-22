@@ -1,85 +1,108 @@
 package com.botmaker.plugin.toolkit;
 
-import org.junit.jupiter.api.DisplayNameGeneration;
-import org.junit.jupiter.api.DisplayNameGenerator;
+import com.botmaker.plugin.toolkit.testing.TestContexts;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The module's only behaviour that can be asserted without a JavaFX toolkit — and the only behaviour worth
- * asserting anyway. Everything else here builds a {@code Node}, and a test that a builder returned non-null
- * proves nothing a compile did not.
+ * {@link Values}, which is what a widget reads a value through.
  *
- * <p>What these hold is the one promise the whole toolkit rests on: <b>a value that cannot be read still
- * opens an editor</b>. Every case below is a real state a project file reaches — a half-written tuple, a
- * value from a newer plugin, a null in a list — and in every one the answer is a default rather than an
- * exception, because an editor that throws while building leaves a row of the Parameters window empty.
+ * <p>Every case here is a real state a bot's source reaches, and in every one the answer is the caller's
+ * fallback rather than an exception — the toolkit's rule 2, restated for typed values. An editor that
+ * throws while building its node leaves a row of the Parameters window with no widget in it.
+ *
+ * <p>The half worth the most is {@link Values#setNumber}: a widget works in {@code double} and a field is
+ * declared {@code int}, and only the declaration says which. Getting it wrong writes {@code 3.0} into a
+ * pixel count or truncates a confidence to {@code 0}.
  */
-@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ValuesTest {
 
+    // ---- reading ---------------------------------------------------------------------------------------
+
     @Test
-    void a_missing_item_reads_as_the_empty_string_never_null() {
-        assertEquals("", Values.at(null, 0));
-        assertEquals("", Values.at(List.of(), 0));
-        assertEquals("", Values.at(List.of("a"), 4));
-        assertEquals("", Values.at(List.of("a"), -1));
-        assertEquals("", Values.at(Arrays.asList("a", null), 1));
+    void aValueOfTheRightTypeComesBack() {
+        assertEquals("gold.png", Values.text(TestContexts.row("java.lang.String", "\"gold.png\"")
+                .withValue("gold.png"), ""));
+        assertTrue(Values.flag(TestContexts.row("boolean", "true").withValue(true), false));
+        assertEquals(500, Values.number(TestContexts.row("int", "500").withValue(500), -1));
+    }
+
+    /**
+     * The case an editor most often forgets: an expression the grammar cannot decode. A variable, a
+     * computed initializer, {@code target.center()} — the honest answer is the caller's fallback, and the
+     * honest thing to draw is what {@link Slots#raw} holds.
+     */
+    @Test
+    void anUndecodableValueAnswersTheFallbackRatherThanZero() {
+        var computed = TestContexts.row("double", "config.confidence()");
+
+        assertEquals(0.8, Values.number(computed, 0.8), "never 0, which for a confidence means match anything");
+        assertEquals("(none)", Values.text(computed, "(none)"));
+        assertFalse(Values.flag(computed, false));
+        assertEquals("config.confidence()", Slots.raw(computed));
     }
 
     @Test
-    void a_number_that_is_not_a_number_falls_back_rather_than_throwing() {
-        assertEquals(7, Values.intAt(List.of("nonsense"), 0, 7));
-        assertEquals(7, Values.intAt(List.of(), 0, 7));
-        assertEquals(7, Values.intAt(List.of("2.5"), 0, 7));
-        assertEquals(12, Values.intAt(List.of("  12  "), 0, 7));
-        assertEquals(0.5, Values.doubleAt(List.of("0.5"), 0, 9));
-        assertEquals(9, Values.doubleAt(List.of("nonsense"), 0, 9));
+    void aValueOfAnotherTypeIsNotThisOne() {
+        var flagged = TestContexts.row("boolean", "true").withValue(true);
+
+        assertEquals("", Values.text(flagged, ""));
+        assertEquals(-1, Values.number(flagged, -1));
     }
 
+    /** Every numeric type answers, which is why the read asks for each box rather than for {@code Number}. */
     @Test
-    void a_half_written_tuple_still_yields_a_full_one() {
-        assertArrayEquals(new int[]{1, 2, 0, 0}, Values.ints(List.of("1", "2"), 4));
-        assertArrayEquals(new int[]{0, 0}, Values.ints(null, 2));
-        assertArrayEquals(new int[]{1, 0, 3}, Values.ints(List.of("1", "x", "3"), 3));
-        assertArrayEquals(new int[]{}, Values.ints(List.of("1"), 0));
-        assertArrayEquals(new int[]{}, Values.ints(List.of("1"), -3));
+    void everyNumericTypeReadsAsANumber() {
+        assertEquals(3, Values.number(TestContexts.row("int", "3").withValue(3), -1));
+        assertEquals(3, Values.number(TestContexts.row("long", "3L").withValue(3L), -1));
+        assertEquals(0.5, Values.number(TestContexts.row("double", "0.5").withValue(0.5), -1));
+        assertEquals(0.5, Values.number(TestContexts.row("float", "0.5f").withValue(0.5f), -1));
     }
 
+    // ---- writing ---------------------------------------------------------------------------------------
+
+    /** The declared type decides the box, so a slider at 2.6 on an {@code int} field writes {@code 3}. */
     @Test
-    void numbers_round_trip_through_the_wire_form() {
-        assertEquals(List.of("1", "2", "3", "4"), Values.of(1, 2, 3, 4));
-        assertEquals(List.of(), Values.of());
-        assertArrayEquals(new int[]{-5, 0}, Values.ints(Values.of(-5, 0), 2));
+    void aNumberIsWrittenAsTheTypeTheFieldIsDeclaredAs() {
+        var whole = TestContexts.row("int", "0");
+        Values.setNumber(whole, 2.6);
+        assertEquals(3, whole.value());
+
+        var counted = TestContexts.row("long", "0");
+        Values.setNumber(counted, 1500.0);
+        assertEquals(1500L, counted.value());
+
+        var fraction = TestContexts.row("double", "0");
+        Values.setNumber(fraction, 0.8);
+        assertEquals(0.8, fraction.value());
     }
 
+    /** A box is the same answer as its primitive: which one a field declares is not the widget's business. */
     @Test
-    void blank_is_about_every_item_not_only_the_first() {
-        assertTrue(Values.isBlank(null));
-        assertTrue(Values.isBlank(List.of()));
-        assertTrue(Values.isBlank(List.of("", "   ")));
-        assertTrue(Values.isBlank(Arrays.asList(null, null)));
-        assertFalse(Values.isBlank(List.of("", "x")));
+    void aBoxedTypeIsTheSameAnswerAsItsPrimitive() {
+        var boxed = TestContexts.row("java.lang.Integer", "0");
+        Values.setNumber(boxed, 7.0);
+        assertEquals(7, boxed.value());
     }
 
+    /** An unresolved or non-numeric type keeps the most information rather than guessing. */
     @Test
-    void a_label_falls_back_only_when_it_says_nothing() {
-        assertEquals("Choose…", Values.labelOr(null, "Choose…"));
-        assertEquals("Choose…", Values.labelOr("   ", "Choose…"));
-        assertEquals("0", Values.labelOr("0", "Choose…"));
+    void anUnknownTypeIsWrittenAsADouble() {
+        var unknown = TestContexts.row("", "");
+        Values.setNumber(unknown, 1.5);
+        assertEquals(1.5, unknown.value());
     }
 
+    // ---- labels ----------------------------------------------------------------------------------------
+
     @Test
-    void a_thumbnail_with_no_label_shows_its_value() {
-        assertEquals("mine.png", new Thumbnail("mine.png", null, null).label());
-        assertEquals("mine.png", new Thumbnail("mine.png", "  ", null).label());
-        assertEquals("", Thumbnail.of(null, null).value());
+    void anUnsetLabelReadsAsItsPlaceholder() {
+        assertEquals("Choose region…", Values.labelOr("", "Choose region…"));
+        assertEquals("Choose region…", Values.labelOr("   ", "Choose region…"));
+        assertEquals("Choose region…", Values.labelOr(null, "Choose region…"));
+        assertEquals("10, 20", Values.labelOr("10, 20", "Choose region…"));
     }
 }

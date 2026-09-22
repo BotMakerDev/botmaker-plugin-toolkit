@@ -9,14 +9,61 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Removed
 
+- **JavaPoet — this module now resolves nothing.** It was the only dependency a plugin ever pulled in
+  through the toolkit, taken in 2026-08-28 because `Source` had to emit Java. A value crosses as a value
+  now and the host spells it, so what was left of `Source` used JavaPoet for a `CodeBlock` with no caller
+  and a `ClassName.get(Class)` that is `Class.getCanonicalName()`. Both of this module's dependencies are
+  `provided`, which is a version conflict a plugin author can no longer have.
+- **`Codecs`** — `of`, `ofEnum`, `or` and `seeded`, with the `ValueCodec` they built. The last three had
+  **zero callers anywhere in the repository**, and the four string methods stopped being read when storage
+  stopped being text.
+- **`CallSites`** — 116 lines of `Predicate<ValueContext>` construction with no JavaFX in it. It is
+  `SlotEditor.forCall` and `SlotEditor.forType` on the contract now: *which slot an editor claims* is
+  contract vocabulary, the same argument that put `SlotEditor.of` there.
+- **Nine of `Slots`' eleven methods** — `arguments`, `ints`, `literal`, `isNumber`, `holdsNumbers`,
+  `stringLiteral`, `quote`, `writeConstructor`, `write`, `writeText`. They parsed the Java the contract used
+  to hand over, and between them they were a second copy of the host's depth-zero split, two of the
+  project's three numeric-literal strippers, and a weaker string unescaper. `raw` and `isEmpty` survive for
+  the one thing a typed value cannot answer: showing an expression the grammar could not decode.
+- **Six of `Source`'s members** — `newInstance`, `enumConstant`, `number`, `character`, `imports`, `code`
+  and the `Expr` type they took, plus the readers `stringValue` and `characterValue`. `string`, `type` and
+  `requireMethod` remain, for the one place a plugin still authors text a user pastes.
+- **`Values`' whole `List<String>` half** — `at`, `intAt`, `doubleAt`, `ints`, `of`, `isBlank`. It read a
+  wire form the contract deleted on 2026-09-20, and its javadoc pointed at a method that went with it.
+- **`Editors.pickWith` and the `static ScreenPicks` behind it.** One field shared by every plugin in the
+  process, last writer winning silently. `tuplePill` takes the picker as an argument now.
 - **`AbstractStudioPlugin.buildParameters()` and the `parameters(String)` it memoised.** The contract
   surface they overrode is deleted: nothing ever declared a parameter group, so the host read back a
   pre-2026-09-17 project's JSON and nothing else. A parameter is a `@Param` field in the bot's own Java, and
   a plugin that wants a row of its own puts one in the file it ships. This class now memoises three
   contributions rather than four.
 
+### Added
+
+- **`AbstractPluginType<T>`** — holds the type's own `Class` and reads components back as `whole(parts, 0)`,
+  `text(parts, 1)` and so on, each degrading rather than throwing. Optional, like everything here. It
+  deliberately does **not** implement `ComponentType`: a type may be picked without being taken apart, and
+  taken apart without ever being picked.
+
 ### Changed
 
+- **Every editor reads a value instead of parsing source.** `Editors` goes through
+  `ValueContext.value(Class)` and `set(Object)`, so the pairs that existed only to span two encodings —
+  `text`/`textSlot`, `choice`/`choiceSlot`, `numbers`/`tuplePill` — collapse into one method each.
+- **`Editors.flag` no longer asks the host to import a class called `true`.** It wrote
+  `Slots.write(ctx, "true", "true")`, and the second argument landed in the varargs tail that means
+  *imports needed* — a leftover from the `storedForm` parameter deleted on 2026-09-20. `set(Object)` has no
+  tail for it to fall into.
+- **`Editors.tuplePill(ctx, ComponentType, TupleSpec, ScreenPicks)`.** The arity used to be stated three
+  times with nothing checking them — a `Class<?>` on the spec, a `labels.length`, and whichever
+  `writeConstructor` call each pick arm made — so a `labels` array one short wrote a `Rect` with three
+  arguments. It is `componentTypes().size()` now, and labels are naming only.
+- **`AbstractStudioPlugin.buildTypes()`** replaces `buildValueTypes()`, and `catalog()` loses the
+  `pinnedVersion` argument this class was already memoising away.
+- **`TestContexts.Recording` records the value, not a spelling.** `withValue(Object)` seeds what
+  `value(Class)` answers and `value()` reads back what an editor wrote; the stub owns no grammar and does
+  not pretend to. It also answers a primitive's `qualifiedName()` correctly, which the old "has it got a
+  dot in it" test read as unresolved — so a widget asking `TypeRef.is(int.class)` never matched an `int`.
 - **Recompiled against the contract's new packages.** `SlotEditor`, `SlotContext`, `SlotRun`,
   `ValueContext` and `TypeRef` are `com.botmaker.plugin.api.slot` now, the parameter types are
   `…api.parameters`, the toolbar types are `…api.toolbar` and the source types are `…api.source`. Imports

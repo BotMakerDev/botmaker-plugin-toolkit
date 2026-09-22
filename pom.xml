@@ -40,7 +40,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>25.0.4</javafx.version>
         <junit.version>5.10.2</junit.version>
-        <javapoet.version>0.7.0</javapoet.version>
         <!-- The reactor/offline value. jitpack.yml injects the released tag from .deps.env at build time. -->
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
     </properties>
@@ -74,21 +73,21 @@
         </dependency>
 
         <!--
-          JavaPoet, and it is the FIRST dependency this module has ever had that a plugin actually resolves
-          — `compile` scope, so it becomes every plugin's transitive dependency and its compatibility
-          becomes ours. That is the standing warning in this module's CLAUDE.md, taken deliberately:
-          `Source` exists because a plugin emits Java whether it means to or not (a ValueCodec's literal, a
-          slot's expression), and this project already carried three hand-rolled copies of string escaping.
-          One jar, 106 KB, no transitive dependencies of its own.
+          JavaPoet stood here from 2026-08-28 to 2026-09-22, and it was the ONLY dependency this module has
+          ever had that a plugin actually resolved — `compile` scope, so it became every plugin's transitive
+          dependency and its compatibility became ours. That was the standing warning in this module's
+          CLAUDE.md, taken deliberately at the time because `Source` had to emit Java and this project
+          already carried three hand-rolled copies of string escaping.
 
-          com.palantir.javapoet, not com.squareup: the original has had no release since 1.13.0 in 2021 and
-          this is the maintained fork of it.
+          It is gone because the emitting went. A plugin does not write Java any more: a value crosses as a
+          value and the host spells it, through the plugin's own ComponentType. What was left of Source used
+          JavaPoet for two things — CodeBlock joining a constructor's arguments, which has no caller, and
+          ClassName.get(Class) spelling a nested type Outer.Inner rather than Outer$Inner, which is
+          Class.getCanonicalName() and is what ClassName.get reads too.
+
+          This module now resolves NOTHING: both dependencies are `provided`. A plugin author cannot get a
+          version conflict out of the toolkit, which is the property to keep.
         -->
-        <dependency>
-            <groupId>com.palantir.javapoet</groupId>
-            <artifactId>javapoet</artifactId>
-            <version>${javapoet.version}</version>
-        </dependency>
 
         <!--
           There was a jackson-databind here for one day (2026-09-09), with `com.botmaker.plugin.toolkit.config`
