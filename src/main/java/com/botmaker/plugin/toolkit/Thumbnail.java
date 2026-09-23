@@ -3,13 +3,13 @@ package com.botmaker.plugin.toolkit;
 import javafx.scene.image.Image;
 
 /**
- * One cell of a picture chooser: what the user sees, and what gets written if they pick it.
+ * One cell of a picture chooser: what the user sees, and the key the caller is handed if they pick it.
  *
  * <p>Four of the thirteen editors this toolkit was extracted from are the same chooser with different
  * pictures in it — an image template, a template group, a game's cover art, an emulator's screen — so the
  * grid is the widget and this is its item.
  *
- * @param value what {@link com.botmaker.plugin.api.slot.ValueContext#setSource(String, Class...)} is called with; never shown
+ * @param value the key the chooser hands back — a game id, a picture's name; never shown
  * @param label the caption under the picture, and what is shown when there is no picture
  * @param image the picture, or {@code null} — a missing image is an ordinary state (a template whose file
  *              was deleted, cover art that never downloaded) and renders as the label alone

@@ -160,35 +160,6 @@ public final class Editors {
     }
 
     /**
-     * A pill opening a grid of pictures.
-     *
-     * <p>{@code items} is a {@link Supplier} and is called when the pill is opened, never when it is built:
-     * what there is to choose from moves — a template captured a moment ago, an emulator that just started —
-     * and a list read at render time is the list as it was when the block first appeared.
-     *
-     * <p>A {@link Thumbnail}'s {@code value} is the Java expression written into the bot's source, so an item
-     * naming a picture carries {@code Pictures.ORE} rather than {@code ore}. It goes through
-     * {@link ValueContext#setSource(String, Class...)} for that reason — it is a reference to something the bot
-     * declares, not a value this editor holds.
-     */
-    public static Node gallery(ValueContext ctx, String title, Supplier<List<Thumbnail>> items,
-                               String emptyMessage) {
-        MenuButton pill = Pills.bare(Values.labelOr(Slots.raw(ctx), "Choose…"));
-        Pills.onOpen(pill, () -> List.of(
-                Pills.item("Choose…", () -> Modals.chooser(ctx, title,
-                        items == null ? List.of() : items.get(), emptyMessage, picked -> {
-                            ctx.setSource(picked.value());
-                            pill.setText(Values.labelOr(picked.label(), "Choose…"));
-                        })),
-                Pills.separator(),
-                Pills.item("Clear", () -> {
-                    ctx.setSource("");
-                    pill.setText("Choose…");
-                })));
-        return pill;
-    }
-
-    /**
      * A number that has a range, and the words that make the range mean something.
      *
      * <p>Every field here exists because a bare number does not say it. {@code 0.8} means something only once

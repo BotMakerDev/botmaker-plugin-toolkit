@@ -25,9 +25,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   to hand over, and between them they were a second copy of the host's depth-zero split, two of the
   project's three numeric-literal strippers, and a weaker string unescaper. `raw` and `isEmpty` survive for
   the one thing a typed value cannot answer: showing an expression the grammar could not decode.
-- **Six of `Source`'s members** — `newInstance`, `enumConstant`, `number`, `character`, `imports`, `code`
-  and the `Expr` type they took, plus the readers `stringValue` and `characterValue`. `string`, `type` and
-  `requireMethod` remain, for the one place a plugin still authors text a user pastes.
+- **`Source`, whole** — it wrote Java for a plugin: literals, type names, calls. Its last callers were the
+  SDK's macro recorder, which the host replaced, and `TestContexts.setSource`, which the contract no longer
+  has.
+- **`Editors.gallery`** — a picture chooser that wrote the picked cell's value as Java text. Nothing called
+  it; the SDK's editors use `Modals.gallery` and hand the host a value.
+- **`TestContexts`' text half** — `written()`, `imports()`, `withEnclosingSource`, `enclosingReplacement()`,
+  with the contract members they stood in for (`setSource`, `enclosingCall`, `replaceEnclosingCall`).
+  `withRun` takes `SlotRun.Element`s or values, and `runReplacement()` is the list of values handed back.
 - **`Values`' whole `List<String>` half** — `at`, `intAt`, `doubleAt`, `ints`, `of`, `isBlank`. It read a
   wire form the contract deleted on 2026-09-20, and its javadoc pointed at a method that went with it.
 - **`Editors.pickWith` and the `static ScreenPicks` behind it.** One field shared by every plugin in the

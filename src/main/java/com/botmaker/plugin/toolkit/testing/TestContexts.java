@@ -27,9 +27,9 @@ import java.util.Optional;
  *
  * <h2>What is real and what is not</h2>
  *
- * <p>The value, the type, the call site and the writes are <b>real</b>: {@link Recording#written()} returns
- * exactly the expression the editor asked for, so a test asserts on the string that would have reached the
- * file. {@link ValueContext#services()} is <b>not</b>: it answers {@code null}, because every one of those
+ * <p>The value, the type, the call site and the writes are <b>real</b>: {@link Recording#value()} returns
+ * exactly the value the editor handed back, which is what the host would have spelled into the file.
+ * {@link ValueContext#services()} is <b>not</b>: it answers {@code null}, because every one of those
  * services is the host doing something a test has no way to fake — dragging a region on a real screen, owning
  * a real window. An editor that reaches for one in a test fails with an NPE naming the line, which is the
  * honest outcome; test that editor's <em>predicate</em> here and its dialog by hand.
@@ -93,17 +93,14 @@ public final class TestContexts {
         private final String enclosingMethod;
         private final int argIndex;
 
-        private String source;
+        private final String source;
         private Object value;
-        private final List<String> imports = new ArrayList<>();
-        private String enclosingReplacement;
-        private String enclosingSource;
         private int writes;
 
-        private List<String> runElements;
+        private List<SlotRun.Element> runElements;
         private int runMinimum;
-        private List<String> runAllowed;
-        private List<String> runReplacement;
+        private List<Object> runAllowed;
+        private List<Object> runReplacement;
 
         private Recording(String typeName, String source, boolean isSlot,
                           String enclosingClass, String enclosingMethod, int argIndex) {
@@ -140,58 +137,36 @@ public final class TestContexts {
             return this;
         }
 
-        /** The source of the call this slot sits in, for an editor that reads it. Fluent, for setup. */
-        public Recording withEnclosingSource(String source) {
-            this.enclosingSource = source;
-            return this;
-        }
-
         /**
          * Makes this slot part of a {@link SlotRun} of {@code elements}, as a varargs argument is.
          *
          * <p>Without it {@link #siblingRun()} is empty, which is what nearly every real slot answers and so
          * the case an editor must handle first. {@code minimum} and {@code allowed} are the host's two
-         * narrowings — how few elements the surrounding code still compiles with, and the only element
-         * sources it will accept ({@code null} for no limit).
+         * narrowings — how few elements the surrounding code still compiles with, and the only values it
+         * will accept ({@code null} for no limit).
          */
-        public Recording withRun(List<String> elements, int minimum, List<String> allowed) {
+        public Recording withRun(List<SlotRun.Element> elements, int minimum, List<Object> allowed) {
             this.runElements = elements == null ? List.of() : List.copyOf(elements);
             this.runMinimum = Math.max(0, minimum);
             this.runAllowed = allowed == null ? null : List.copyOf(allowed);
             return this;
         }
 
-        /** As {@link #withRun(List, int, List)}, with no minimum and no narrowing. */
-        public Recording withRun(String... elements) {
-            return withRun(List.of(elements), 0, null);
+        /** A run of readable values, with no minimum and no narrowing. */
+        public Recording withRun(Object... values) {
+            List<SlotRun.Element> elements = new ArrayList<>();
+            for (Object each : values) elements.add(element(each));
+            return withRun(elements, 0, null);
         }
 
         /** What {@link SlotRun#replace} was last given, or {@code null} if the editor never rewrote the run. */
-        public List<String> runReplacement() {
+        public List<Object> runReplacement() {
             return runReplacement;
-        }
-
-        /**
-         * The Java expression the value now holds — what {@link #setSource(String, Class...)} was last given, or
-         * the initial one.
-         */
-        public String written() {
-            return source;
         }
 
         /** The value the editor last wrote through {@link #set(Object)}, or what {@link #withValue} seeded. */
         public Object value() {
             return value;
-        }
-
-        /** The imports the last {@link #set} asked for. */
-        public List<String> imports() {
-            return List.copyOf(imports);
-        }
-
-        /** What {@link #replaceEnclosingCall} was last given, or {@code null}. */
-        public String enclosingReplacement() {
-            return enclosingReplacement;
         }
 
         /**
@@ -249,18 +224,6 @@ public final class TestContexts {
             return source;
         }
 
-        @Override
-        public void setSource(String javaExpression, Class<?>... importsNeeded) {
-            this.source = javaExpression == null ? "" : javaExpression;
-            this.imports.clear();
-            if (importsNeeded != null) {
-                for (Class<?> needed : importsNeeded) {
-                    if (needed != null) this.imports.add(com.botmaker.plugin.toolkit.Source.type(needed));
-                }
-            }
-            writes++;
-        }
-
         /** Always {@code null}: every service is the host doing something a test cannot fake. */
         @Override
         public StudioServices services() {
@@ -287,24 +250,20 @@ public final class TestContexts {
             return argIndex;
         }
 
-        @Override
-        public Optional<String> enclosingCall() {
-            return Optional.ofNullable(enclosingSource);
-        }
-
         /**
          * The run set up by {@link #withRun}, or empty.
          *
          * <p>{@link SlotRun#replace} records rather than writes, and it enforces {@link SlotRun#minimum()}
          * exactly as the host does — a shorter list leaves the elements alone and counts no write, so a test
-         * can assert that an editor's floor is honoured rather than trusting it.
+         * can assert that an editor's floor is honoured rather than trusting it. An {@link SlotRun.Element}
+         * handed back is kept as it was; any other item becomes a readable element.
          */
         @Override
         public Optional<SlotRun> siblingRun() {
             if (runElements == null) return Optional.empty();
             return Optional.of(new SlotRun() {
                 @Override
-                public List<String> elements() {
+                public List<Element> elements() {
                     return runElements;
                 }
 
@@ -314,30 +273,26 @@ public final class TestContexts {
                 }
 
                 @Override
-                public Optional<List<String>> allowedSources() {
+                public Optional<List<Object>> allowed() {
                     return Optional.ofNullable(runAllowed);
                 }
 
                 @Override
-                public void replace(List<String> javaExpressions, String... importsNeeded) {
-                    List<String> next = javaExpressions == null ? List.of() : List.copyOf(javaExpressions);
+                public void replace(List<?> items) {
+                    List<Object> next = items == null ? List.of() : List.copyOf(items);
                     if (next.size() < runMinimum) return;
+                    List<Element> elements = new ArrayList<>();
+                    for (Object item : next) elements.add(item instanceof Element kept ? kept : element(item));
                     runReplacement = next;
-                    runElements = next;
-                    imports.clear();
-                    if (importsNeeded != null) imports.addAll(List.of(importsNeeded));
+                    runElements = List.copyOf(elements);
                     writes++;
                 }
             });
         }
+    }
 
-        @Override
-        public void replaceEnclosingCall(String javaExpression, String... importsNeeded) {
-            this.enclosingReplacement = javaExpression;
-            this.enclosingSource = javaExpression;
-            this.imports.clear();
-            if (importsNeeded != null) this.imports.addAll(List.of(importsNeeded));
-            writes++;
-        }
+    /** A readable element, shown as its own {@code toString} — this module writes no Java. */
+    private static SlotRun.Element element(Object value) {
+        return new SlotRun.Element(value, String.valueOf(value));
     }
 }

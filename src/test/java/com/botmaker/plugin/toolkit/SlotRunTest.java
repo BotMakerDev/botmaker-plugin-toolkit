@@ -8,6 +8,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,21 +32,33 @@ class SlotRunTest {
         SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "a")
                 .withRun("a", "b", "c")
                 .siblingRun().orElseThrow();
-        assertEquals(List.of("a", "b", "c"), run.elements());
+        assertEquals(List.of("a", "b", "c"), run.elements().stream().map(SlotRun.Element::value).toList());
         assertEquals(0, run.minimum());
-        assertTrue(run.allowedSources().isEmpty());
+        assertTrue(run.allowed().isEmpty());
     }
 
     @Test
     void replacingTheRunWritesTheWholeList() {
         TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a").withRun("a", "b");
-        ctx.siblingRun().orElseThrow().replace(List.of("a", "b", "c"), "com.example.Thing");
+        ctx.siblingRun().orElseThrow().replace(List.of("a", "b", "c"));
 
         assertEquals(List.of("a", "b", "c"), ctx.runReplacement());
         // The run's own view moves with it, so a second edit reads what the first one wrote.
-        assertEquals(List.of("a", "b", "c"), ctx.siblingRun().orElseThrow().elements());
-        assertEquals(List.of("com.example.Thing"), ctx.imports());
+        assertEquals(List.of("a", "b", "c"),
+                ctx.siblingRun().orElseThrow().elements().stream().map(SlotRun.Element::value).toList());
         assertEquals(1, ctx.writes());
+    }
+
+    @Test
+    void anElementHandedBackIsKeptAsWritten() {
+        // A variable in the run has no value; rewriting the run around it must not lose it.
+        SlotRun.Element unread = new SlotRun.Element(null, "someVariable");
+        TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a")
+                .withRun(List.of(unread), 0, null);
+
+        ctx.siblingRun().orElseThrow().replace(List.of(unread, "b"));
+
+        assertSame(unread, ctx.siblingRun().orElseThrow().elements().getFirst());
     }
 
     @Test
@@ -53,27 +66,22 @@ class SlotRunTest {
         // The floor is the host's knowledge, not the plugin's: a guarded branch stops compiling without it.
         // An editor that ignores it must not be able to produce source that will not build.
         TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a")
-                .withRun(List.of("a", "b"), 2, null);
+                .withRun(List.of(new SlotRun.Element("a", "a"), new SlotRun.Element("b", "b")), 2, null);
 
         ctx.siblingRun().orElseThrow().replace(List.of("a"));
 
         assertNull(ctx.runReplacement());
-        assertEquals(List.of("a", "b"), ctx.siblingRun().orElseThrow().elements());
+        assertEquals(2, ctx.siblingRun().orElseThrow().elements().size());
         assertEquals(0, ctx.writes());
     }
 
     @Test
-    void narrowingIsElementSourcesRatherThanDecodedValues() {
-        // Java source on both sides: the host computes the allowed set by looking at the code around the run,
-        // which it can do without knowing what any of the strings mean.
-        SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "new ImageTemplate(\"gold.png\")")
-                .withRun(List.of("new ImageTemplate(\"gold.png\")"), 1,
-                        List.of("new ImageTemplate(\"gold.png\")", "new ImageTemplate(\"ore.png\")"))
+    void narrowingIsValues() {
+        SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "a")
+                .withRun(List.of(new SlotRun.Element("gold", "gold")), 1, List.of("gold", "ore"))
                 .siblingRun().orElseThrow();
 
-        List<String> allowed = run.allowedSources().orElseThrow();
-        assertEquals(2, allowed.size());
-        assertTrue(allowed.getFirst().startsWith("new ImageTemplate("));
+        assertEquals(List.of("gold", "ore"), run.allowed().orElseThrow());
     }
 
     @Test

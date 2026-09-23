@@ -5,6 +5,15 @@ reasoning.
 
 ## Done
 
+### 2026-09-23 — no Java in the toolkit: `Source`, `Slots.arguments` and `Editors.gallery` go
+
+The contract stopped carrying Java for a plugin to write (`setSource`, `replaceEnclosingCall`) or split
+(`enclosingCall`), and `SlotRun` crosses values. What was here to serve them had no caller left: `Source`
+(the macro recorder was its last user), `Slots.arguments` (documented as for the enclosing call and nothing
+else), and `Editors.gallery`, which wrote a picked cell as text and was never called. `TestContexts` records
+values only; `withRun` takes `SlotRun.Element`s. `Slots.raw`/`isEmpty` stay, to show what the host could not
+read. 19 tests (`SourceTest` went with `Source`).
+
 ### 2026-09-23 — `buildCatalog()` stays empty; the host discovers the palette
 
 The example and the javadoc drop `PaletteCatalog.of(…)`: the host (`botmaker-plugin-host`'s `Palettes`)

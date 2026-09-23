@@ -103,9 +103,14 @@ being text.
 **`TestContexts` gained `withRun` on 2026-08-31**, for the contract's new `SlotRun`. It records what an
 editor writes to a run *and enforces `minimum()` exactly as the host does* — a `replace` with too few
 elements leaves the elements alone and counts no write — so a test can assert that an editor honours the
-floor rather than trusting it. `run()` answers `null` without it, which is what nearly every real slot
-answers and therefore the case an editor must handle first. `SlotRunTest` holds those cases.
-| `Source` (2026-08-28) | three members: a string literal, a type's name, a method-name check | a recorded macro is Java a **user pastes**, so it has no type for the host to spell it from; and this project already had three hand-rolled escapers, each of which stopped at the backslash and the quote |
+floor rather than trusting it. `siblingRun()` is empty without it, which is what nearly every real slot
+answers and therefore the case an editor must handle first. `SlotRunTest` holds those cases. Since
+2026-09-23 a run is values (`SlotRun.Element`), and `TestContexts` records values only.
+
+**`Source` was here from 2026-08-28 to 2026-09-23** — a string literal, a type's name, a method-name check,
+for the SDK's macro recorder, whose statements a user pasted. Recording is the host's now and no plugin writes
+Java, so it is deleted with `SourceTest`.
+
 | `ZoomPan` (2026-08-30) | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a `Pane` and a content `Group` | it names no capture target, no colour and nothing of any plugin's API — it is a gesture, which is the definition of a shape. Written in Studio, held in the SDK for two slices because Studio source may not name a toolkit type, and moved the moment both its callers were the SDK's |
 
 **`Styles.UNTHEMED` arrived with `ZoomPan` and is the first style class here that is an *opt-out*.** The host
@@ -139,16 +144,11 @@ in it that know what a launch call is.
 because one half wrote the characters and the other wrote a Java string literal — two encodings of one
 value, which is the thing that change exists to remove.
 
-**One thing that looks liftable and is not: the SDK's `LiteralWriter` keeps its own escaping rather than
-using `Source`.** Not an oversight. The crash argument for it came and went — Studio carried no toolkit, then
-briefly did (2026-08-28 to 2026-09-02), and does not again — but the conclusion never depended on it:
-**the SDK is a library *and* a plugin, and only its plugin half (`plugin/`, `internal/plugin/`) may name
+**The SDK is a library *and* a plugin, and only its plugin half (`plugin/`, `internal/plugin/`) may name
 us.** A library half that reached for a plugin's widget kit would be unusable in every host that does not
 happen to bundle one — which, since Studio stopped bundling any plugin at all, is **every host without
-exception**.
-
-So the ~15 lines `Source` and `LiteralWriter` have in common are **deliberate duplication**, and the SDK's
-copy carries a comment saying so.
+exception**. (That is why the SDK's `LiteralWriter` kept its own escaping rather than using `Source`; both
+are deleted since 2026-09-23.)
 
 ## The three rules
 
@@ -163,7 +163,8 @@ state, not a failure path. `Values` degrades to the caller's fallback in every c
 that throws in its constructor leaves a row of the Parameters window with no widget in it and no explanation
 — which reads as the host being broken.
 
-**2b. No plugin parses anything (2026-09-22).** There is no `Slots.arguments`, no `Slots.ints`, no
+**2b. No plugin parses or writes anything (2026-09-22, finished 2026-09-23).** There is no `Slots.arguments`
+(it outlived the rest by a day, for the enclosing call the contract no longer hands over), no `Slots.ints`, no
 `Slots.stringLiteral` and no `Slots.holdsNumbers`. Those existed because `ValueContext` handed over a
 `String` of Java, so every editor parsed it — which produced three numeric-literal strippers, two argument
 splitters and one string unescaper across two modules, none agreeing with the host's. Read the value with
@@ -208,11 +209,9 @@ spells it, through the plugin's own `ComponentType`. What was left of `Source` u
 spelling a nested type `Outer.Inner` rather than `Outer$Inner` — which is `Class.getCanonicalName()`, and is
 what `ClassName.get` reads too.
 
-**The escaping argument survives intact and is why `Source.string` stays.** The SDK's macro translator turns
-a recording into *statements a user pastes*, which is not a value and has no type, so the host cannot spell
-it. Three hand-rolled escapers existed before that method (here, in the SDK, and in the generated skeleton)
-and each escaped the backslash and the quote and stopped, so a pasted tab produced a slot that would not
-compile.
+**The escaping argument kept `Source.string` until 2026-09-23**, for the SDK's macro translator, whose
+recording was *statements a user pastes*. The host writes a recording now, from a plugin's `@Records`
+methods, and `Source` is deleted. The history below is why each of its members was shaped as it was.
 
 **`Source.call` was deleted on 2026-09-04, and the reason is the rule to apply to the next member proposed
 here.** It composed `Type.method(a, b)` and checked the method name reflectively, and it had **no production
@@ -262,15 +261,13 @@ mistake it exists to prevent — that a bare `TextField` loses edits made by cli
 ## Building
 
 ```bash
-mvn test        # ValuesTest, SourceTest, SlotRunTest, TupleLabelTest (28) — what is assertable with
+mvn test        # ValuesTest, SlotRunTest, TupleLabelTest (19) — what is assertable with
                 # no JavaFX toolkit
 mvn dependency:tree   # nothing at `compile`: the property to keep
 mvn install     # com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
 ```
 
-Do not add a test that asserts a builder returned non-null; a compile proves that. `SourceTest` is the
-other kind worth having: its output is compiled by **somebody else's** build, so a wrong escape is a
-compile error in a bot, reported against a line its author never wrote. What is worth holding is
+Do not add a test that asserts a builder returned non-null; a compile proves that. What is worth holding is
 in `ValuesTest`: every case there is a real state a project file reaches, and in every one the answer is a
 default rather than an exception.
 
