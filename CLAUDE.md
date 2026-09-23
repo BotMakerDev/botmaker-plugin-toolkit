@@ -44,7 +44,7 @@ must be a *widget or a shape*, useful to a plugin that has no vocabulary of its 
 mean anything, it belongs to the plugin that owns them.
 
 **And the rule on the SDK's side is unchanged, with its exception moved house**: *only the SDK's plugin half
-(`plugin/`, `internal/plugin/`) may name a toolkit **widget***. `api/config/Settings` is a library-half
+(`plugin/`, held by the SDK's `PluginLayersTest` since 2026-09-23) may name a toolkit **widget***. `api/config/Settings` is a library-half
 class, and what it names is another plugin's API (`com.botmaker.plugin.basics.store`) rather than anything
 here.
 
@@ -144,7 +144,7 @@ in it that know what a launch call is.
 because one half wrote the characters and the other wrote a Java string literal — two encodings of one
 value, which is the thing that change exists to remove.
 
-**The SDK is a library *and* a plugin, and only its plugin half (`plugin/`, `internal/plugin/`) may name
+**The SDK is a library *and* a plugin, and only its plugin half (`plugin/`) may name
 us.** A library half that reached for a plugin's widget kit would be unusable in every host that does not
 happen to bundle one — which, since Studio stopped bundling any plugin at all, is **every host without
 exception**. (That is why the SDK's `LiteralWriter` kept its own escaping rather than using `Source`; both
