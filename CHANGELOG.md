@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **`AbstractStudioPlugin.buildCatalog()` scans by default**: it answers `PaletteCatalog.scan(getClass())`,
+  every `@Palette` class in the plugin's own jar, where it answered an empty catalog. A plugin names its
+  palette by annotating it and overrides nothing; a plugin with no annotated class still offers an empty
+  catalog.
+
 ### Removed
 
 - **JavaPoet — this module now resolves nothing.** It was the only dependency a plugin ever pulled in

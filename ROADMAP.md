@@ -5,6 +5,12 @@ reasoning.
 
 ## Done
 
+### 2026-09-23 — `buildCatalog()` scans by default
+
+`AbstractStudioPlugin.buildCatalog()` answers `PaletteCatalog.scan(getClass())` instead of an empty catalog.
+A plugin declares its palette by annotating classes and overrides nothing. A plugin with no `@Palette` class
+still answers empty, which the host reads as "declined to curate", as before.
+
 ### 2026-09-04 — `Source.call` is deleted, and the method-reference idea is written down as refused
 
 `Source.call(Class, String method, Expr...)` composed `Type.method(a, b)` with the type fully qualified, and
