@@ -5,11 +5,11 @@ reasoning.
 
 ## Done
 
-### 2026-09-23 — `buildCatalog()` scans by default
+### 2026-09-23 — `buildCatalog()` stays empty; the host discovers the palette
 
-`AbstractStudioPlugin.buildCatalog()` answers `PaletteCatalog.scan(getClass())` instead of an empty catalog.
-A plugin declares its palette by annotating classes and overrides nothing. A plugin with no `@Palette` class
-still answers empty, which the host reads as "declined to curate", as before.
+The example and the javadoc drop `PaletteCatalog.of(…)`: the host (`botmaker-plugin-host`'s `Palettes`)
+catalogues every `@Palette` class in a plugin's jar when `catalog()` is empty. A scan here was tried the
+same day and withdrawn, because a discovery each plugin runs on itself is the host's job done N times.
 
 ### 2026-09-04 — `Source.call` is deleted, and the method-reference idea is written down as refused
 

@@ -14,7 +14,7 @@ import java.util.List;
  * public final class DiscordPlugin extends AbstractStudioPlugin {
  *     public DiscordPlugin() { super("com.example.discord", "Discord"); }
  *
- *     // the palette is every @Palette class in this jar; buildCatalog() needs no override
+ *     // no buildCatalog(): the host finds every @Palette class in this jar
  *     @Override protected List<PluginType<?>> buildTypes()    { return DiscordTypes.ALL; }
  *     @Override protected List<SlotEditor> buildSlotEditors() { return DiscordEditors.ALL; }
  * }
@@ -70,12 +70,11 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     }
 
     /**
-     * The palette this plugin offers: by default every {@code @Palette} class in this plugin's own jar
-     * ({@link PaletteCatalog#scan(Class)}), so a plugin names its palette only by annotating it. A plugin
-     * with no annotated class offers an empty catalog. Called at most once.
+     * A palette built by hand. Leave it empty, the default, and the host discovers the palette from the
+     * {@code @Palette} classes in this plugin's jar. Called at most once.
      */
     protected PaletteCatalog buildCatalog() {
-        return PaletteCatalog.scan(getClass());
+        return PaletteCatalog.empty();
     }
 
     /** The types this plugin declares, in the order a picker should offer them. Called at most once. */
