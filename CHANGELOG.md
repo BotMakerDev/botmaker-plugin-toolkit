@@ -9,6 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 No source changes since v0.1.7; re-released for updated upstream pins.
 
+### Changed
+
+- **`TestContexts` takes classes and methods, not names** (contract 0.3.0). `row(Class, source)`,
+  `typedSlot(Class, source)`, `withType(Class)`, and `slot(Executable, argIndex, source)`, which types the
+  slot as that parameter (the component type in a varargs tail); `method(owner, name, parameters…)` finds
+  the `Executable`. A `null` type or call is one the host could not resolve — the case a type- or
+  call-keyed editor must decline.
+
 ### Removed
 
 - **JavaPoet — this module now resolves nothing.** It was the only dependency a plugin ever pulled in

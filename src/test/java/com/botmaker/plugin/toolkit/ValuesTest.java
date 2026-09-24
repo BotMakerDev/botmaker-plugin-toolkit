@@ -24,10 +24,10 @@ class ValuesTest {
 
     @Test
     void aValueOfTheRightTypeComesBack() {
-        assertEquals("gold.png", Values.text(TestContexts.row("java.lang.String", "\"gold.png\"")
+        assertEquals("gold.png", Values.text(TestContexts.row(String.class,"\"gold.png\"")
                 .withValue("gold.png"), ""));
-        assertTrue(Values.flag(TestContexts.row("boolean", "true").withValue(true), false));
-        assertEquals(500, Values.number(TestContexts.row("int", "500").withValue(500), -1));
+        assertTrue(Values.flag(TestContexts.row(boolean.class,"true").withValue(true), false));
+        assertEquals(500, Values.number(TestContexts.row(int.class,"500").withValue(500), -1));
     }
 
     /**
@@ -37,7 +37,7 @@ class ValuesTest {
      */
     @Test
     void anUndecodableValueAnswersTheFallbackRatherThanZero() {
-        var computed = TestContexts.row("double", "config.confidence()");
+        var computed = TestContexts.row(double.class,"config.confidence()");
 
         assertEquals(0.8, Values.number(computed, 0.8), "never 0, which for a confidence means match anything");
         assertEquals("(none)", Values.text(computed, "(none)"));
@@ -47,7 +47,7 @@ class ValuesTest {
 
     @Test
     void aValueOfAnotherTypeIsNotThisOne() {
-        var flagged = TestContexts.row("boolean", "true").withValue(true);
+        var flagged = TestContexts.row(boolean.class,"true").withValue(true);
 
         assertEquals("", Values.text(flagged, ""));
         assertEquals(-1, Values.number(flagged, -1));
@@ -56,10 +56,10 @@ class ValuesTest {
     /** Every numeric type answers, which is why the read asks for each box rather than for {@code Number}. */
     @Test
     void everyNumericTypeReadsAsANumber() {
-        assertEquals(3, Values.number(TestContexts.row("int", "3").withValue(3), -1));
-        assertEquals(3, Values.number(TestContexts.row("long", "3L").withValue(3L), -1));
-        assertEquals(0.5, Values.number(TestContexts.row("double", "0.5").withValue(0.5), -1));
-        assertEquals(0.5, Values.number(TestContexts.row("float", "0.5f").withValue(0.5f), -1));
+        assertEquals(3, Values.number(TestContexts.row(int.class,"3").withValue(3), -1));
+        assertEquals(3, Values.number(TestContexts.row(long.class,"3L").withValue(3L), -1));
+        assertEquals(0.5, Values.number(TestContexts.row(double.class,"0.5").withValue(0.5), -1));
+        assertEquals(0.5, Values.number(TestContexts.row(float.class,"0.5f").withValue(0.5f), -1));
     }
 
     // ---- writing ---------------------------------------------------------------------------------------
@@ -67,15 +67,15 @@ class ValuesTest {
     /** The declared type decides the box, so a slider at 2.6 on an {@code int} field writes {@code 3}. */
     @Test
     void aNumberIsWrittenAsTheTypeTheFieldIsDeclaredAs() {
-        var whole = TestContexts.row("int", "0");
+        var whole = TestContexts.row(int.class,"0");
         Values.setNumber(whole, 2.6);
         assertEquals(3, whole.value());
 
-        var counted = TestContexts.row("long", "0");
+        var counted = TestContexts.row(long.class,"0");
         Values.setNumber(counted, 1500.0);
         assertEquals(1500L, counted.value());
 
-        var fraction = TestContexts.row("double", "0");
+        var fraction = TestContexts.row(double.class,"0");
         Values.setNumber(fraction, 0.8);
         assertEquals(0.8, fraction.value());
     }
@@ -83,7 +83,7 @@ class ValuesTest {
     /** A box is the same answer as its primitive: which one a field declares is not the widget's business. */
     @Test
     void aBoxedTypeIsTheSameAnswerAsItsPrimitive() {
-        var boxed = TestContexts.row("java.lang.Integer", "0");
+        var boxed = TestContexts.row(Integer.class,"0");
         Values.setNumber(boxed, 7.0);
         assertEquals(7, boxed.value());
     }
@@ -91,7 +91,7 @@ class ValuesTest {
     /** An unresolved or non-numeric type keeps the most information rather than guessing. */
     @Test
     void anUnknownTypeIsWrittenAsADouble() {
-        var unknown = TestContexts.row("", "");
+        var unknown = TestContexts.row(null, "");
         Values.setNumber(unknown, 1.5);
         assertEquals(1.5, unknown.value());
     }

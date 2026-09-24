@@ -45,13 +45,13 @@ class TupleLabelTest {
 
     @Test
     void anEmptySlotReadsAsItsPlaceholder() {
-        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot("Rect", ""), RECT, SPEC));
-        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot("Rect", "  "), RECT, SPEC));
+        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot(Rect.class,""), RECT, SPEC));
+        assertEquals("Choose region…", Editors.tupleLabel(TestContexts.typedSlot(Rect.class,"  "), RECT, SPEC));
     }
 
     @Test
     void aValueTheTypeDescribesIsLabelledTheWayThePluginSpellsIt() {
-        var slot = TestContexts.typedSlot("Rect", "new Rect(10, 20, 640, 480)")
+        var slot = TestContexts.typedSlot(Rect.class,"new Rect(10, 20, 640, 480)")
                 .withValue(new Rect(10, 20, 640, 480));
 
         assertEquals("10, 20  640×480", Editors.tupleLabel(slot, RECT, SPEC));
@@ -64,15 +64,15 @@ class TupleLabelTest {
     @Test
     void anExpressionTheGrammarCannotReadIsShownAsWritten() {
         assertEquals("target.bounds()",
-                Editors.tupleLabel(TestContexts.typedSlot("Rect", "target.bounds()"), RECT, SPEC));
+                Editors.tupleLabel(TestContexts.typedSlot(Rect.class,"target.bounds()"), RECT, SPEC));
         assertEquals("BOUNDS",
-                Editors.tupleLabel(TestContexts.typedSlot("Rect", "BOUNDS"), RECT, SPEC));
+                Editors.tupleLabel(TestContexts.typedSlot(Rect.class,"BOUNDS"), RECT, SPEC));
     }
 
     /** A spelling that is not a constructor is no longer a reason to refuse a label. */
     @Test
     void aFactoryCallLabelsJustAsAConstructorDoes() {
-        var factory = TestContexts.typedSlot("Rect", "Rect.of(1, 2, 3, 4)")
+        var factory = TestContexts.typedSlot(Rect.class,"Rect.of(1, 2, 3, 4)")
                 .withValue(new Rect(1, 2, 3, 4));
 
         assertEquals("1, 2  3×4", Editors.tupleLabel(factory, RECT, SPEC));

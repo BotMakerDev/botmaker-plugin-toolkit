@@ -6,6 +6,9 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
 
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,9 +23,9 @@ import java.util.Optional;
  * enough friction that the predicate half generally went untested.
  *
  * <pre>{@code
- * var ctx = TestContexts.slot("Game", "launchSteam", 0, "\"440\"");
+ * var ctx = TestContexts.slot(TestContexts.method(Game.class, "launchSteam"), 0, "\"440\"");
  * assertTrue(STEAM_APP_ID.test(ctx));
- * assertFalse(STEAM_APP_ID.test(TestContexts.row("java.lang.String", "\"440\"")));
+ * assertFalse(STEAM_APP_ID.test(TestContexts.row(String.class, "\"440\"")));
  * }</pre>
  *
  * <h2>What is real and what is not</h2>
@@ -41,11 +44,6 @@ public final class TestContexts {
 
     private TestContexts() {}
 
-    /** The eight primitive spellings, taken off the class literals so nothing here is typed out. */
-    private static final java.util.Set<String> PRIMITIVES = java.util.Set.of(
-            boolean.class.getName(), byte.class.getName(), char.class.getName(), short.class.getName(),
-            int.class.getName(), long.class.getName(), float.class.getName(), double.class.getName());
-
     /**
      * A value with a type and no call behind it — a Parameters row, or a {@code @Managed} method's value.
      *
@@ -53,29 +51,62 @@ public final class TestContexts {
      * — and the one most easily forgotten, because it is the case that cannot arise while an editor is being
      * developed against a bot's source.
      *
-     * @param typeName the declared type, simple or qualified
-     * @param source   the Java expression the value is written as — {@code "\"gold.png\""}, {@code "3"}
+     * @param type   the declared type, or {@code null} for one the host could not resolve
+     * @param source the Java expression the value is written as — {@code "\"gold.png\""}, {@code "3"}
      */
-    public static Recording row(String typeName, String source) {
-        return new Recording(typeName, source, false, null, null, -1);
+    public static Recording row(Class<?> type, String source) {
+        return new Recording(type, source, false, null, -1);
     }
 
     /**
-     * A slot in a bot's source, with the call around it.
+     * A slot in a bot's source: argument {@code argIndex} of {@code call}, typed as that parameter — the
+     * component type for an argument of a varargs tail.
      *
-     * @param enclosingClass  the class the call is on, as the host resolved it — a simple or a qualified name
-     * @param enclosingMethod the method being called
-     * @param argIndex        which argument this slot is, counting from 0
-     * @param currentSource   the Java expression currently in the slot
+     * @param call          the method or constructor called, as the host resolved it; {@code null} for a
+     *                      call it could not resolve — see {@link #method}
+     * @param argIndex      which argument this slot is, counting from 0
+     * @param currentSource the Java expression currently in the slot
      */
-    public static Recording slot(String enclosingClass, String enclosingMethod, int argIndex,
-                                 String currentSource) {
-        return new Recording("", currentSource, true, enclosingClass, enclosingMethod, argIndex);
+    public static Recording slot(Executable call, int argIndex, String currentSource) {
+        return new Recording(parameterType(call, argIndex), currentSource, true, call, argIndex);
     }
 
     /** A slot of a known type with no call around it — a field initialiser, a local declaration. */
-    public static Recording typedSlot(String typeName, String currentSource) {
-        return new Recording(typeName, currentSource, true, null, null, -1);
+    public static Recording typedSlot(Class<?> type, String currentSource) {
+        return new Recording(type, currentSource, true, null, -1);
+    }
+
+    /**
+     * The public method {@code owner} declares as {@code name} — the one overload with {@code parameters}
+     * when they are given, and otherwise the only one; for {@link #slot}. Throws when there is none, or when
+     * the name is overloaded and no parameters say which.
+     */
+    public static Method method(Class<?> owner, String name, Class<?>... parameters) {
+        if (parameters.length > 0) {
+            try {
+                return owner.getDeclaredMethod(name, parameters);
+            } catch (NoSuchMethodException e) {
+                throw new IllegalArgumentException(owner.getName() + " declares no " + name, e);
+            }
+        }
+        List<Method> named = new ArrayList<>();
+        for (Method each : owner.getDeclaredMethods()) {
+            if (each.getName().equals(name) && Modifier.isPublic(each.getModifiers())) named.add(each);
+        }
+        if (named.size() != 1) {
+            throw new IllegalArgumentException(owner.getName() + " declares " + named.size() + " public "
+                    + name + " methods; name the parameters");
+        }
+        return named.getFirst();
+    }
+
+    private static Class<?> parameterType(Executable call, int argIndex) {
+        if (call == null || argIndex < 0) return null;
+        Class<?>[] parameters = call.getParameterTypes();
+        if (call.isVarArgs() && argIndex >= parameters.length - 1) {
+            return parameters[parameters.length - 1].getComponentType();
+        }
+        return argIndex < parameters.length ? parameters[argIndex] : null;
     }
 
     /**
@@ -87,10 +118,9 @@ public final class TestContexts {
      */
     public static final class Recording implements SlotContext {
 
-        private String typeName;
+        private Class<?> type;
         private final boolean isSlot;
-        private final String enclosingClass;
-        private final String enclosingMethod;
+        private final Executable call;
         private final int argIndex;
 
         private final String source;
@@ -102,23 +132,20 @@ public final class TestContexts {
         private List<Object> runAllowed;
         private List<Object> runReplacement;
 
-        private Recording(String typeName, String source, boolean isSlot,
-                          String enclosingClass, String enclosingMethod, int argIndex) {
-            this.typeName = typeName == null ? "" : typeName;
+        private Recording(Class<?> type, String source, boolean isSlot, Executable call, int argIndex) {
+            this.type = type;
             this.source = source == null ? "" : source;
             this.isSlot = isSlot;
-            this.enclosingClass = enclosingClass;
-            this.enclosingMethod = enclosingMethod;
+            this.call = call;
             this.argIndex = argIndex;
         }
 
         /**
-         * The declared type of the value, for a context built by {@link #slot} — which knows the call but not
-         * the type. A name with no dot in it answers only {@link TypeRef#simpleName()}, exactly as the host's
-         * own {@code TypeRef} does for a type it could not resolve.
+         * The declared type of the value, in place of the one {@link #slot} read off the call — a slot typed
+         * as an interface holding one implementation, say. {@code null} is a type the host could not resolve.
          */
-        public Recording withType(String typeName) {
-            this.typeName = typeName == null ? "" : typeName;
+        public Recording withType(Class<?> type) {
+            this.type = type;
             return this;
         }
 
@@ -182,22 +209,7 @@ public final class TestContexts {
 
         @Override
         public TypeRef type() {
-            return new TypeRef() {
-                @Override
-                public String simpleName() {
-                    int dot = typeName.lastIndexOf('.');
-                    return dot < 0 ? typeName : typeName.substring(dot + 1);
-                }
-
-                @Override
-                public String qualifiedName() {
-                    // A primitive IS its own qualified name, which "has it got a dot in it" reads as
-                    // unresolved — and a widget asking TypeRef.is(int.class) then never matches an `int`
-                    // field. The names come off the class literals rather than being typed, so a fourth
-                    // hand-rolled keyword list is not created here.
-                    return typeName.indexOf('.') >= 0 || PRIMITIVES.contains(typeName) ? typeName : "";
-                }
-            };
+            return type == null ? TypeRef.unresolved("") : TypeRef.of(type);
         }
 
         /** What {@link #withValue} seeded, when it is of the type asked for. Empty otherwise. */
@@ -236,13 +248,8 @@ public final class TestContexts {
         }
 
         @Override
-        public Optional<String> enclosingClassName() {
-            return Optional.ofNullable(enclosingClass);
-        }
-
-        @Override
-        public Optional<String> enclosingMethodName() {
-            return Optional.ofNullable(enclosingMethod);
+        public Optional<Executable> enclosingExecutable() {
+            return Optional.ofNullable(call);
         }
 
         @Override

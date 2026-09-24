@@ -23,13 +23,13 @@ class SlotRunTest {
     @Test
     void aSlotStandingAloneHasNoRun() {
         // The ordinary case, and the one an editor must handle first: nearly every slot is a single argument.
-        assertTrue(TestContexts.slot("Mouse", "click", 0, "new Point(1, 2)").siblingRun().isEmpty());
-        assertTrue(TestContexts.row("java.awt.Color", "0xff0000").siblingRun().isEmpty());
+        assertTrue(TestContexts.slot(null, 0, "new Point(1, 2)").siblingRun().isEmpty());
+        assertTrue(TestContexts.row(Integer.class, "0xff0000").siblingRun().isEmpty());
     }
 
     @Test
     void aRunReportsItsElementsInOrder() {
-        SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "a")
+        SlotRun run = TestContexts.slot(null, 0,"a")
                 .withRun("a", "b", "c")
                 .siblingRun().orElseThrow();
         assertEquals(List.of("a", "b", "c"), run.elements().stream().map(SlotRun.Element::value).toList());
@@ -39,7 +39,7 @@ class SlotRunTest {
 
     @Test
     void replacingTheRunWritesTheWholeList() {
-        TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a").withRun("a", "b");
+        TestContexts.Recording ctx = TestContexts.slot(null, 0,"a").withRun("a", "b");
         ctx.siblingRun().orElseThrow().replace(List.of("a", "b", "c"));
 
         assertEquals(List.of("a", "b", "c"), ctx.runReplacement());
@@ -53,7 +53,7 @@ class SlotRunTest {
     void anElementHandedBackIsKeptAsWritten() {
         // A variable in the run has no value; rewriting the run around it must not lose it.
         SlotRun.Element unread = new SlotRun.Element(null, "someVariable");
-        TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a")
+        TestContexts.Recording ctx = TestContexts.slot(null, 0,"a")
                 .withRun(List.of(unread), 0, null);
 
         ctx.siblingRun().orElseThrow().replace(List.of(unread, "b"));
@@ -65,7 +65,7 @@ class SlotRunTest {
     void aRunBelowItsMinimumIsRefusedRatherThanWritten() {
         // The floor is the host's knowledge, not the plugin's: a guarded branch stops compiling without it.
         // An editor that ignores it must not be able to produce source that will not build.
-        TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a")
+        TestContexts.Recording ctx = TestContexts.slot(null, 0,"a")
                 .withRun(List.of(new SlotRun.Element("a", "a"), new SlotRun.Element("b", "b")), 2, null);
 
         ctx.siblingRun().orElseThrow().replace(List.of("a"));
@@ -77,7 +77,7 @@ class SlotRunTest {
 
     @Test
     void narrowingIsValues() {
-        SlotRun run = TestContexts.slot("Matches", "hasAny", 0, "a")
+        SlotRun run = TestContexts.slot(null, 0,"a")
                 .withRun(List.of(new SlotRun.Element("gold", "gold")), 1, List.of("gold", "ore"))
                 .siblingRun().orElseThrow();
 
@@ -86,7 +86,7 @@ class SlotRunTest {
 
     @Test
     void buildingTheContextWritesNothing() {
-        TestContexts.Recording ctx = TestContexts.slot("Matches", "hasAny", 0, "a").withRun("a", "b");
+        TestContexts.Recording ctx = TestContexts.slot(null, 0,"a").withRun("a", "b");
         assertEquals(0, ctx.writes());
     }
 }
