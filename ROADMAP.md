@@ -5,6 +5,10 @@ reasoning.
 
 ## Done
 
+### 2026-09-26 — `TestContexts.Recording.withArgument` (picker phase 6a)
+
+A test slot answers `argumentValue` with what the test seeded, set and never derived, as `withValue` is.
+
 ### 2026-09-23 — no Java in the toolkit: `Source`, `Slots.arguments` and `Editors.gallery` go
 
 The contract stopped carrying Java for a plugin to write (`setSource`, `replaceEnclosingCall`) or split

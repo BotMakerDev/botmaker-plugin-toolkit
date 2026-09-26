@@ -10,7 +10,9 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -131,6 +133,7 @@ public final class TestContexts {
         private int runMinimum;
         private List<Object> runAllowed;
         private List<Object> runReplacement;
+        private final Map<Integer, Object> arguments = new HashMap<>();
 
         private Recording(Class<?> type, String source, boolean isSlot, Executable call, int argIndex) {
             this.type = type;
@@ -184,6 +187,16 @@ public final class TestContexts {
             List<SlotRun.Element> elements = new ArrayList<>();
             for (Object each : values) elements.add(element(each));
             return withRun(elements, 0, null);
+        }
+
+        /**
+         * What {@link SlotContext#argumentValue} answers for argument {@code index} of the call — the host's
+         * reading of a neighbour, such as the {@code Color} beside a {@code Precision}. Set, never derived, for
+         * the reason {@link #withValue} gives.
+         */
+        public Recording withArgument(int index, Object value) {
+            arguments.put(index, value);
+            return this;
         }
 
         /** What {@link SlotRun#replace} was last given, or {@code null} if the editor never rewrote the run. */
@@ -255,6 +268,13 @@ public final class TestContexts {
         @Override
         public int argIndex() {
             return argIndex;
+        }
+
+        /** What {@link #withArgument} seeded for {@code index}, when it is of the type asked for. */
+        @Override
+        public <T> Optional<T> argumentValue(int index, Class<T> type) {
+            Object held = arguments.get(index);
+            return type != null && type.isInstance(held) ? Optional.of(type.cast(held)) : Optional.empty();
         }
 
         /**
