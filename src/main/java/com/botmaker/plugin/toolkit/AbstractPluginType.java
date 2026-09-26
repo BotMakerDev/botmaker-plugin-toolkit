@@ -10,7 +10,7 @@ import java.util.List;
  * every line.
  *
  * <pre>{@code
- * final class PointType extends AbstractPluginType<Point> implements ComponentType<Point> {
+ * final class PointType extends AbstractPluginType<Point> implements EditableType<Point>, ComponentType<Point> {
  *     PointType() { super(Point.class); }
  *
  *     @Override public Point fresh()                  { return new Point(0, 0); }
@@ -30,6 +30,10 @@ import java.util.List;
  * a type may be picked without being taken apart, and taken apart without ever being picked — and welding
  * them here would owe every enum constant a {@code components} nothing calls. Extend this, and add
  * {@code implements ComponentType<T>} when the type's Java is a call.
+ *
+ * <p><b>It deliberately does not implement {@code EditableType} either</b> (2026-09-27): a type is drawn by its
+ * owner only when it says so, so a subclass that answered {@code null} from an inherited {@code editor} cannot
+ * pass {@code botmaker plugin validate}'s picker check by accident. Add {@code implements EditableType<T>}.
  *
  * <h2>Why the readers are here and not on the contract</h2>
  *

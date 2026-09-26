@@ -5,6 +5,13 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **`AbstractPluginType` does not implement `EditableType`** (contract 0.3.0), and its example says so: a
+  subclass that draws its type adds `implements EditableType<T>`.
+
 ## [0.1.9] — 2026-09-27
 
 ### Added
