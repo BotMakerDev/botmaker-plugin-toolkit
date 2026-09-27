@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`ManagedHandle<T>`**: one `@Managed` value, read and written from a plugin's window with no id spelled
+  and no cast — `open`, `openOrCreate` (asks the host for the holder first), `read` (a `T`), `readable`,
+  `write` (creates when missing; answers the sentence to show, or null). Every step is total.
+
 - **`ScreenPicks.choices()`** — where a pick can be made, each a picker bound to it; a tuple pill lists them
   in its own menu (*Edit values…*, a separator, then the surfaces) instead of a "Pick on screen…" entry that
   opened a second menu. Empty by default.

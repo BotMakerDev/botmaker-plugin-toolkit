@@ -91,6 +91,7 @@ more that are not widgets at all:
 | `Slots` | the value as it is **written**, for an expression nothing can decode | two methods since 2026-09-22; see *No plugin parses anything* below |
 | `AbstractStudioPlugin` | the contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
 | `AbstractPluginType` | a `PluginType` that holds its own `Class` and reads components back without a cast per line | `build(List<Object>)` is the one place a declaration trusts what it is handed; a helper makes a wrong index a clearer failure than a `ClassCastException` on an unrelated line |
+| `ManagedHandle` (2026-09-28) | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window | every plugin with a value wrote the same four steps by hand, once per value; it names no plugin's word — the type comes from the plugin's own `ManagedValue<T>` |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
 
 **`CallSites` and `Codecs` were here and are deleted (2026-09-22).** `CallSites` is

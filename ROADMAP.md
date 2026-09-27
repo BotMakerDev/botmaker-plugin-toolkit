@@ -5,6 +5,12 @@ reasoning.
 
 ## Done
 
+### 2026-09-28 — `ManagedHandle` (plugin authoring cleanup, phase 2)
+
+One `@Managed` value from a plugin's window: `open`, `openOrCreate`, `read`, `readable`, `write`, each total.
+It replaces the open–read–create–set steps the SDK wrote once per value (`FlowValue`, `CaptureValue`,
+`BotSettingsWindow`). `ManagedHandleTest` runs it against an in-memory project.
+
 ### 2026-09-27 — flat pick menu and the tuple dialog (picker feedback 2, phase 4)
 
 `tuplePill` reads *Edit values…*, a separator, a disabled heading (`Pick.heading()`), then one entry per
