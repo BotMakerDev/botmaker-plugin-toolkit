@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`ScreenPicks.choices()`** — where a pick can be made, each a picker bound to it; a tuple pill lists them
+  in its own menu (*Edit values…*, a separator, then the surfaces) instead of a "Pick on screen…" entry that
+  opened a second menu. Empty by default.
+- **`Modals.tuple`** — the reworked *Edit values…* dialog: a ▲/▼ stepper per number (arrows and the wheel,
+  Shift for 10), a to-scale drawing (a point on a grid, a size box, a rectangle in its frame), a rectangle's
+  right and bottom, and pasting `x, y` or `x, y, w, h` into any field fills them all. `Editors.Pick.heading()`.
 - **`Styles.SWITCH`** — an on/off toggle whose state shows in its colour (the host draws off red, on green).
 - **`TestContexts.Recording.withBounds`** — what `ValueContext.bounds()` answers; the stub does not clamp, so
   a test catches an editor that ignores the range.

@@ -2,6 +2,7 @@ package com.botmaker.plugin.toolkit;
 
 import javafx.scene.paint.Color;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -44,6 +45,18 @@ public interface ScreenPicks {
 
     /** Point at one pixel and report its colour. */
     void color(Consumer<Color> onSampled);
+
+    /** One place a pick can be made, named as the plugin names it, and the picker bound to it. */
+    record Choice(String label, ScreenPicks picks) {}
+
+    /**
+     * Where a pick can be made, when the plugin offers a choice of surfaces — the bot's window, another
+     * window, the whole desktop — so a widget lists them in its own menu rather than opening a second menu
+     * after the first (feedback 2, 2026-09-27). Empty, the default, means this picker asks for itself.
+     */
+    default List<Choice> choices() {
+        return List.of();
+    }
 
     /**
      * The fallback for a plugin that registered none — every pick does nothing.

@@ -104,6 +104,146 @@ public final class Modals {
     }
 
     /**
+     * The numbers of a thing on the screen — a point, a size, a rectangle — each with a ▲/▼ stepper (arrows
+     * and the wheel too; Shift steps by ten), a drawing of it to scale beside them, and for a rectangle where
+     * it ends. Pasting {@code "x, y"} or {@code "x, y, w, h"} into any field fills them all. OK hands
+     * {@code onCommit} one value per label; Cancel hands it nothing (feedback 2, 2026-09-27 — this was a row of
+     * bare fields, {@link #numbers}).
+     *
+     * @param shape which drawing: {@link Editors.Pick#POINT} a point on a grid, {@link Editors.Pick#MEASURE} a
+     *              box, anything else with four numbers a rectangle in its frame
+     */
+    public static void tuple(ValueContext ctx, String title, String[] labels, int[] initial, Editors.Pick shape,
+                             Consumer<int[]> onCommit) {
+        String[] names = labels == null ? new String[0] : labels;
+        int[] values = new int[names.length];
+        for (int i = 0; i < values.length; i++) values[i] = initial != null && i < initial.length ? initial[i] : 0;
+
+        javafx.scene.canvas.Canvas preview = new javafx.scene.canvas.Canvas(180, 120);
+        Label readout = Styles.on(new Label(), Styles.CAPTION);
+        TextField[] fields = new TextField[names.length];
+        Runnable redraw = () -> {
+            drawTuple(preview, shape, values);
+            readout.setText(TupleFields.readout(values));
+        };
+
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(6);
+        grid.setVgap(6);
+        for (int i = 0; i < names.length; i++) {
+            int at = i;
+            TextField field = Styles.on(new TextField(Integer.toString(values[i])), Styles.INSET_FIELD);
+            field.setPrefColumnCount(6);
+            fields[i] = field;
+            field.textProperty().addListener((o, was, is) -> {
+                java.util.Optional<int[]> pasted = TupleFields.paste(is, values.length);
+                if (pasted.isPresent()) {
+                    // After this change settles: a field's text cannot be replaced from inside its own listener.
+                    javafx.application.Platform.runLater(() -> {
+                        for (int k = 0; k < values.length; k++) {
+                            values[k] = pasted.get()[k];
+                            fields[k].setText(Integer.toString(values[k]));
+                        }
+                        redraw.run();
+                    });
+                    return;
+                }
+                values[at] = parseInt(is);
+                redraw.run();
+            });
+            Runnable up = () -> field.setText(Integer.toString(TupleFields.step(values[at], 1, false)));
+            field.setOnKeyPressed(e -> {
+                int direction = switch (e.getCode()) {
+                    case UP -> 1;
+                    case DOWN -> -1;
+                    default -> 0;
+                };
+                if (direction == 0) return;
+                field.setText(Integer.toString(TupleFields.step(values[at], direction, e.isShiftDown())));
+                e.consume();
+            });
+            field.setOnScroll(e -> {
+                if (e.getDeltaY() == 0) return;
+                field.setText(Integer.toString(TupleFields.step(values[at], e.getDeltaY() > 0 ? 1 : -1,
+                        e.isShiftDown())));
+                e.consume();
+            });
+            Button plus = Pills.icon("▲", up);
+            Button minus = Pills.icon("▼",
+                    () -> field.setText(Integer.toString(TupleFields.step(values[at], -1, false))));
+            plus.setFocusTraversable(false);
+            minus.setFocusTraversable(false);
+            grid.add(Styles.on(new Label(names[i]), Styles.CAPTION), 0, i);
+            grid.add(field, 1, i);
+            grid.add(new HBox(2, plus, minus), 2, i);
+        }
+        Label hint = Styles.on(new Label("Arrows or the wheel step by 1, with Shift by 10. Paste \"x, y\" to "
+                + "fill every field."), Styles.DIALOG_HINT);
+        hint.setWrapText(true);
+        hint.setMaxWidth(420);
+        VBox side = new VBox(4, preview, readout);
+        HBox body = new HBox(16, grid, side);
+        redraw.run();
+
+        Stage stage = new Stage();
+        Runnable commit = () -> {
+            stage.close();
+            if (onCommit != null) onCommit.accept(values.clone());
+        };
+        VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), body, hint,
+                buttons(commit, stage::close)), Styles.DIALOG_COMPACT);
+        show(ctx, stage, title, root);
+    }
+
+    /**
+     * The tuple to scale: a point on a grid, a size as a box, a rectangle inside a frame reaching as far as it
+     * does. Drawn in fixed hues that read on both themes, since a canvas is not styled by a stylesheet.
+     */
+    private static void drawTuple(javafx.scene.canvas.Canvas canvas, Editors.Pick shape, int[] v) {
+        javafx.scene.canvas.GraphicsContext g = canvas.getGraphicsContext2D();
+        double w = canvas.getWidth();
+        double h = canvas.getHeight();
+        g.clearRect(0, 0, w, h);
+        javafx.scene.paint.Color frame = javafx.scene.paint.Color.gray(0.5, 0.6);
+        javafx.scene.paint.Color accent = javafx.scene.paint.Color.web("#3b82f6");
+        g.setStroke(frame);
+        g.setLineWidth(1);
+        g.strokeRect(0.5, 0.5, w - 1, h - 1);
+        if (v.length == 2 && shape == Editors.Pick.POINT) {
+            double span = Math.max(Math.max(Math.abs(v[0]), Math.abs(v[1])) * 1.25, 10);
+            double x = Math.max(0, v[0]) / span * w;
+            double y = Math.max(0, v[1]) / span * h;
+            g.setStroke(javafx.scene.paint.Color.gray(0.5, 0.25));
+            for (int i = 1; i < 4; i++) {
+                g.strokeLine(w * i / 4, 0, w * i / 4, h);
+                g.strokeLine(0, h * i / 4, w, h * i / 4);
+            }
+            g.setStroke(accent);
+            g.setLineWidth(2);
+            g.strokeLine(x - 8, y, x + 8, y);
+            g.strokeLine(x, y - 8, x, y + 8);
+            g.strokeOval(x - 4, y - 4, 8, 8);
+        } else if (v.length == 2) {
+            double scale = Math.min((w - 20) / Math.max(1, Math.abs(v[0])), (h - 20) / Math.max(1, Math.abs(v[1])));
+            double bw = Math.abs(v[0]) * scale;
+            double bh = Math.abs(v[1]) * scale;
+            g.setFill(accent.deriveColor(0, 1, 1, 0.25));
+            g.fillRect((w - bw) / 2, (h - bh) / 2, bw, bh);
+            g.setStroke(accent);
+            g.setLineWidth(2);
+            g.strokeRect((w - bw) / 2, (h - bh) / 2, bw, bh);
+        } else if (v.length == 4) {
+            double span = Math.max(Math.max(v[0] + v[2], v[1] + v[3]) * 1.1, 10);
+            double scale = Math.min(w / span, h / span);
+            g.setFill(accent.deriveColor(0, 1, 1, 0.25));
+            g.fillRect(v[0] * scale, v[1] * scale, Math.max(1, v[2] * scale), Math.max(1, v[3] * scale));
+            g.setStroke(accent);
+            g.setLineWidth(2);
+            g.strokeRect(v[0] * scale, v[1] * scale, Math.max(1, v[2] * scale), Math.max(1, v[3] * scale));
+        }
+    }
+
+    /**
      * A scrolling grid of pictures, one of which the user picks.
      *
      * <p>{@code emptyMessage} is shown in place of the grid when there is nothing to choose — which is a

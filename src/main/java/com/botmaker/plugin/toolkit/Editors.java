@@ -243,26 +243,33 @@ public final class Editors {
     public enum Pick {
 
         /** Drag a rectangle; writes {@code x, y, width, height}. */
-        REGION("Select on screen…"),
+        REGION("Select on screen…", "Select on screen, in:"),
 
         /** Click one pixel under a magnifier; writes {@code x, y}. */
-        POINT("Pick on screen…"),
+        POINT("Pick on screen…", "Pick on screen, in:"),
 
         /** Drag a rectangle and throw the origin away; writes {@code width, height}. */
-        MEASURE("Measure on screen…"),
+        MEASURE("Measure on screen…", "Measure on screen, in:"),
 
         /** No on-screen arm at all — the numbers are only ever typed. */
-        NONE(null);
+        NONE(null, null);
 
         private final String item;
+        private final String heading;
 
-        Pick(String item) {
+        Pick(String item, String heading) {
             this.item = item;
+            this.heading = heading;
         }
 
         /** The menu entry's wording, or {@code null} for {@link #NONE}. */
         public String item() {
             return item;
+        }
+
+        /** The words above a list of surfaces to pick in, or {@code null} for {@link #NONE}. */
+        public String heading() {
+            return heading;
         }
     }
 
@@ -305,17 +312,30 @@ public final class Editors {
                                      ScreenPicks picks) {
         MenuButton pill = Pills.bare(tupleLabel(ctx, type, spec));
         ScreenPicks picker = picks == null ? ScreenPicks.NONE : picks;
+        // Edit values first, then where to pick, each surface an entry of this menu (feedback 2, 2026-09-27):
+        // a "Pick on screen…" entry that opened a second menu of surfaces was one menu too many.
         Pills.onOpen(pill, () -> {
             List<javafx.scene.control.MenuItem> items = new ArrayList<>();
-            if (spec.pick() != Pick.NONE) {
-                items.add(Pills.item(spec.pick().item(), () -> pickTuple(ctx, type, spec, pill, picker)));
-                items.add(Pills.separator());
-            }
-            items.add(Pills.item("Edit values…", () -> Modals.numbers(ctx, spec.title(),
-                    labels(type, spec), numbers(ctx, type), picked -> {
+            items.add(Pills.item("Edit values…", () -> Modals.tuple(ctx, spec.title(),
+                    labels(type, spec), numbers(ctx, type), spec.pick(), picked -> {
                         write(ctx, type, picked);
                         pill.setText(tupleLabel(ctx, type, spec));
                     })));
+            if (spec.pick() != Pick.NONE) {
+                items.add(Pills.separator());
+                List<ScreenPicks.Choice> choices = picker.choices();
+                if (choices.isEmpty()) {
+                    items.add(Pills.item(spec.pick().item(), () -> pickTuple(ctx, type, spec, pill, picker)));
+                } else {
+                    javafx.scene.control.MenuItem heading = new javafx.scene.control.MenuItem(spec.pick().heading());
+                    heading.setDisable(true);
+                    items.add(heading);
+                    for (ScreenPicks.Choice choice : choices) {
+                        items.add(Pills.item(choice.label(),
+                                () -> pickTuple(ctx, type, spec, pill, choice.picks())));
+                    }
+                }
+            }
             return items;
         });
         return pill;

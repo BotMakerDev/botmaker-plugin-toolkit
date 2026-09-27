@@ -5,6 +5,12 @@ reasoning.
 
 ## Done
 
+### 2026-09-27 — flat pick menu and the tuple dialog (picker feedback 2, phase 4)
+
+`tuplePill` reads *Edit values…*, a separator, a disabled heading (`Pick.heading()`), then one entry per
+`ScreenPicks.Choice` — or the old single entry for a picker offering none. *Edit values…* is `Modals.tuple`
+(`numbers` stays public, unused here); its rules are `TupleFields` (paste, step, readout), tested without JavaFX.
+
 ### 2026-09-26 — `TestContexts.Recording.withArgument` (picker phase 6a)
 
 A test slot answers `argumentValue` with what the test seeded, set and never derived, as `withValue` is.
