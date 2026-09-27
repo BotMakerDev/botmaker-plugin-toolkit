@@ -7,6 +7,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **`Styles.SWITCH`** — an on/off toggle whose state shows in its colour (the host draws off red, on green).
+- **`TestContexts.Recording.withBounds`** — what `ValueContext.bounds()` answers; the stub does not clamp, so
+  a test catches an editor that ignores the range.
+
 ### Changed
 
 - **`AbstractPluginType` does not implement `EditableType`** (contract 0.3.0), and its example says so: a

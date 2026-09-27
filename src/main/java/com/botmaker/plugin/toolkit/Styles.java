@@ -67,6 +67,9 @@ public final class Styles {
     /** The confirming button of a dialog — one per dialog, never two. */
     public static final String PRIMARY_BUTTON = "primary-button";
 
+    /** An on/off toggle whose state shows in its colour as well as its word — off one colour, on another. */
+    public static final String SWITCH = "value-switch";
+
     /** One cell of a thumbnail grid. */
     public static final String TILE = "template-tile";
 
