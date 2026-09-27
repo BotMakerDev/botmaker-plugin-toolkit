@@ -77,6 +77,12 @@ So the rule is the original one with the false clause replaced by the true one: 
 denies a plugin its own version (it does not), but because there is no plugin it helps and one it silently
 mis-serves.**
 
+**What both sides need goes in the contract, not here (2026-09-28).** The one thing a plugin's widgets and
+Studio's own genuinely shared was the style-class names; they are the contract's `StyleClasses` now,
+`Styles` implements it, and Studio's `StyleClassesTest` holds the stylesheet to it. A second such thing
+should be asked the same question — *is the host the only possible source?* — before anyone proposes Studio
+take this module.
+
 Enforced regardless, and unchanged throughout: **no Studio source may name a `com.botmaker.plugin.toolkit`
 type.** `StudioSourcesTest` scans Studio's *source* rather than its classpath, which is what keeps it a real
 test now that the way to break the rule is to add the dependency back rather than widen a scope.
@@ -91,6 +97,7 @@ more that are not widgets at all:
 | `Slots` | the value as it is **written**, for an expression nothing can decode | two methods since 2026-09-22; see *No plugin parses anything* below |
 | `AbstractStudioPlugin` | the contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
 | `AbstractPluginType` | a `PluginType` that holds its own `Class` and reads components back without a cast per line | `build(List<Object>)` is the one place a declaration trusts what it is handed; a helper makes a wrong index a clearer failure than a `ClassCastException` on an unrelated line |
+| `Types` (2026-09-28) | a type declared as one expression: `editable`, `enumType`, `record` (a record's canonical constructor), `call` (parts derived from the factory); the `method`/`constructor`/`constant`/`parts` lookups and the part readers | every plugin copied the lookups and a `Fixed`/`Shape` base; a record states its parts already. An editor goes in as `() -> X::editor` (`Types.Drawn`) so building the type list links no JavaFX — `SdkPluginHeadlessTest` caught the plain method reference |
 | `ManagedHandle` (2026-09-28) | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window | every plugin with a value wrote the same four steps by hand, once per value; it names no plugin's word — the type comes from the plugin's own `ManagedValue<T>` |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
 

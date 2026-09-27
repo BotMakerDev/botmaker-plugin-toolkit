@@ -3,20 +3,25 @@ package com.botmaker.plugin.toolkit;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
- * A {@link StudioPlugin} that builds each of its three contributions once, on first use.
+ * A {@link StudioPlugin} that builds each of its declared contributions once, on first use.
  *
  * <pre>{@code
  * public final class DiscordPlugin extends AbstractStudioPlugin {
  *     public DiscordPlugin() { super("com.example.discord", "Discord"); }
  *
  *     // no buildCatalog(): the host finds every @Palette class in this jar
- *     @Override protected List<PluginType<?>> buildTypes()    { return DiscordTypes.ALL; }
- *     @Override protected List<SlotEditor> buildSlotEditors() { return DiscordEditors.ALL; }
+ *     @Override protected List<PluginType<?>> buildTypes()             { return DiscordTypes.ALL; }
+ *     @Override protected List<ComponentType<?>> buildComponentTypes() { return DiscordTypes.CALLS; }
+ *     @Override protected List<SlotEditor> buildSlotEditors()          { return DiscordEditors.ALL; }
+ *     @Override protected List<ManagedValue<?>> buildManagedValues()   { return DiscordValues.ALL; }
  * }
  * }</pre>
  *
@@ -32,7 +37,7 @@ import java.util.List;
  * if the host asks the corresponding question.
  *
  * <p>The memoisation is a plain double-checked read on a {@code volatile} field. A hook may therefore run
- * twice under a race, which is accepted: all three answers are immutable values, and the alternative is
+ * twice under a race, which is accepted: every answer is an immutable value, and the alternative is
  * holding a lock across arbitrary plugin code that the host calls while rendering.
  *
  * <h2>What it deliberately does not do</h2>
@@ -46,7 +51,7 @@ import java.util.List;
  * memoised ignoring it — which was the measurement that deleted the argument: no implementation anywhere
  * read it.
  *
- * <p>It also holds no state beyond the three cached answers and takes no services: a plugin is constructed
+ * <p>It also holds no state beyond the cached answers and takes no services: a plugin is constructed
  * before the host has a project open, so there is nothing to hand it yet. Everything context-dependent
  * arrives later, per call, in a {@code ValueContext}.
  */
@@ -57,7 +62,9 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
 
     private volatile PaletteCatalog catalog;
     private volatile List<PluginType<?>> types;
+    private volatile List<ComponentType<?>> componentTypes;
     private volatile List<SlotEditor> slotEditors;
+    private volatile List<ManagedValue<?>> managedValues;
 
     /** A plugin whose display name is its id. */
     protected AbstractStudioPlugin(String id) {
@@ -92,6 +99,19 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
         return List.of();
     }
 
+    /**
+     * The calls this plugin's values are written as that are not themselves a type it declares — the parts
+     * of a composite, a chain the host only reads. Called at most once.
+     */
+    protected List<ComponentType<?>> buildComponentTypes() {
+        return List.of();
+    }
+
+    /** The {@code @Managed} values this plugin keeps in a bot's Java, each declared once. Called at most once. */
+    protected List<ManagedValue<?>> buildManagedValues() {
+        return List.of();
+    }
+
     // buildParameters() stood here from 2026-09-10 to 2026-09-22, memoising a list of ParameterGroup. The
     // contract surface it overrode is deleted: a parameter is a @Param field in the bot's own Java, and a
     // plugin that wants a row of its own puts one in the file it ships.
@@ -120,22 +140,34 @@ public abstract class AbstractStudioPlugin implements StudioPlugin {
     @Override
     public List<PluginType<?>> types() {
         List<PluginType<?>> local = types;
-        if (local == null) {
-            List<PluginType<?>> built = buildTypes();
-            local = built == null ? List.of() : List.copyOf(built);
-            types = local;
-        }
+        if (local == null) types = local = copy(this::buildTypes);
+        return local;
+    }
+
+    @Override
+    public List<ComponentType<?>> componentTypes() {
+        List<ComponentType<?>> local = componentTypes;
+        if (local == null) componentTypes = local = copy(this::buildComponentTypes);
         return local;
     }
 
     @Override
     public List<SlotEditor> slotEditors() {
         List<SlotEditor> local = slotEditors;
-        if (local == null) {
-            List<SlotEditor> built = buildSlotEditors();
-            local = built == null ? List.of() : List.copyOf(built);
-            slotEditors = local;
-        }
+        if (local == null) slotEditors = local = copy(this::buildSlotEditors);
         return local;
+    }
+
+    @Override
+    public List<ManagedValue<?>> managedValues() {
+        List<ManagedValue<?>> local = managedValues;
+        if (local == null) managedValues = local = copy(this::buildManagedValues);
+        return local;
+    }
+
+    /** A hook's answer, immutable, with {@code null} read as none. */
+    private static <E> List<E> copy(Supplier<List<E>> hook) {
+        List<E> built = hook.get();
+        return built == null ? List.of() : List.copyOf(built);
     }
 }

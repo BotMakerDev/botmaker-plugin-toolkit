@@ -7,24 +7,25 @@ import java.util.List;
 
 /**
  * A {@link PluginType} that holds its own {@link Class} and reads its components back without a cast at
- * every line.
+ * every line — for a declaration that needs more than {@link Types}' lambdas say.
  *
  * <pre>{@code
- * final class PointType extends AbstractPluginType<Point> implements EditableType<Point>, ComponentType<Point> {
- *     PointType() { super(Point.class); }
+ * final class ColorType extends AbstractPluginType<Color> implements EditableType<Color>, ComponentType<Color> {
+ *     ColorType() { super(Color.class); }
  *
- *     @Override public Point fresh()                  { return new Point(0, 0); }
- *     @Override public Node  editor(ValueContext ctx) { return Editors.tuplePill(ctx, this, SPEC, picks); }
+ *     @Override public Color fresh()                  { return Color.WHITE; }
+ *     @Override public Node  editor(ValueContext ctx) { return MyEditors.color(ctx); }
  *
- *     @Override public List<Class<?>> componentTypes()  { return List.of(int.class, int.class); }
- *     @Override public List<Object> components(Point p) { return List.of(p.x(), p.y()); }
- *     @Override public Point build(List<Object> parts)  { return new Point(whole(parts, 0), whole(parts, 1)); }
+ *     @Override public List<Class<?>> componentTypes()  { return List.of(int.class, int.class, int.class); }
+ *     @Override public List<Object> components(Color c) { return List.of(c.getRed(), c.getGreen(), c.getBlue()); }
+ *     @Override public Color build(List<Object> parts)  { return new Color(whole(parts, 0), whole(parts, 1), whole(parts, 2)); }
  * }
  * }</pre>
  *
- * <p><b>Optional, like the rest of this module.</b> It saves one field and the four reads below; a plugin
- * that would rather implement the two interfaces directly loses nothing, and the SDK's enum types do
- * exactly that.
+ * <p><b>Reach for {@link Types} first</b> (2026-09-28): {@code Types.editable(…)}, {@code Types.enumType(…)},
+ * {@code Types.record(…)} and {@code Types.call(…)} declare the same thing as one expression, and the SDK and
+ * basics declare every type they own that way. This class stays for a declaration with state or behaviour of
+ * its own.
  *
  * <p><b>It deliberately does not implement {@link ComponentType}.</b> The two questions are independent —
  * a type may be picked without being taken apart, and taken apart without ever being picked — and welding
@@ -35,18 +36,8 @@ import java.util.List;
  * owner only when it says so, so a subclass that answered {@code null} from an inherited {@code editor} cannot
  * pass {@code botmaker plugin validate}'s picker check by accident. Add {@code implements EditableType<T>}.
  *
- * <h2>Why the readers are here and not on the contract</h2>
- *
- * <p>{@code build(List<Object>)} is the one place a declaration has to trust what it is handed: the host
- * passes back the components this same type produced, so the casts are sound, and a helper that says
- * {@code whole(parts, 0)} rather than {@code (int) parts.get(0)} makes a wrong index a clearer failure
- * than a {@code ClassCastException} on an unrelated line. Putting them on {@link ComponentType} would make
- * them {@code default} methods every implementor inherits whether or not it has components at all.
- *
- * <p>Each one <b>degrades rather than throwing</b> — a missing component reads as zero, empty or
- * {@code false}. A value read out of a user's file may be shorter than this version of the type expects,
- * and the rule everywhere in this module is that no unreadable input may be the reason a project will not
- * open.
+ * <p>The readers are {@link Types}' — {@code whole(parts, 0)} rather than {@code (int) parts.get(0)} — kept
+ * here as inherited names so a subclass reads them unqualified. Each degrades rather than throwing.
  *
  * @param <T> the plugin's own type
  */
@@ -63,44 +54,33 @@ public abstract class AbstractPluginType<T> implements PluginType<T> {
         return type;
     }
 
-    /** Component {@code index} as a whole number, or {@code 0}. */
+    /** {@link Types#whole}. */
     protected static int whole(List<Object> components, int index) {
-        return (int) Math.round(number(components, index));
+        return Types.whole(components, index);
     }
 
-    /** Component {@code index} as a long, or {@code 0}. */
+    /** {@link Types#count}. */
     protected static long count(List<Object> components, int index) {
-        return Math.round(number(components, index));
+        return Types.count(components, index);
     }
 
-    /** Component {@code index} as a fractional number, or {@code 0}. */
+    /** {@link Types#number}. */
     protected static double number(List<Object> components, int index) {
-        Object part = at(components, index);
-        return part instanceof Number n ? n.doubleValue() : 0;
+        return Types.number(components, index);
     }
 
-    /** Component {@code index} as text, or {@code ""}. */
+    /** {@link Types#text}. */
     protected static String text(List<Object> components, int index) {
-        Object part = at(components, index);
-        return part instanceof String s ? s : "";
+        return Types.text(components, index);
     }
 
-    /** Component {@code index} as a yes/no, or {@code false}. */
+    /** {@link Types#flag}. */
     protected static boolean flag(List<Object> components, int index) {
-        Object part = at(components, index);
-        return part instanceof Boolean b && b;
+        return Types.flag(components, index);
     }
 
-    /**
-     * Component {@code index} as {@code as}, or {@code null} — for a component that is itself a value some
-     * type describes.
-     */
+    /** {@link Types#part}. */
     protected static <C> C part(List<Object> components, int index, Class<C> as) {
-        Object part = at(components, index);
-        return as.isInstance(part) ? as.cast(part) : null;
-    }
-
-    private static Object at(List<Object> components, int index) {
-        return components == null || index < 0 || index >= components.size() ? null : components.get(index);
+        return Types.part(components, index, as);
     }
 }

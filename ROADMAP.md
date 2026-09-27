@@ -5,6 +5,15 @@ reasoning.
 
 ## Done
 
+### 2026-09-28 — `Types`, `Modals.owner`, two more build hooks (plugin authoring cleanup, phase 3)
+
+`Types` declares a type as one expression (`editable`, `enumType`, `record`, `call`) and owns the lookups and
+part readers every plugin had copied; `TypesTest` holds the record round trip, the varargs part, the refused
+non-public record and that declaring never reads the editor. `Modals.owner(services)`;
+`AbstractStudioPlugin.buildComponentTypes`/`buildManagedValues`. `Styles` implements the contract's
+`StyleClasses`. `TestContexts.method` keeps its own lookup: it resolves an unnamed overload and throws
+`IllegalArgumentException`, which `Types.method` does not.
+
 ### 2026-09-28 — `ManagedHandle` (plugin authoring cleanup, phase 2)
 
 One `@Managed` value from a plugin's window: `open`, `openOrCreate`, `read`, `readable`, `write`, each total.

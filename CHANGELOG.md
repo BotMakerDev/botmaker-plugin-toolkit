@@ -9,6 +9,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`Types`**: a type declared as one expression instead of one class. `Types.editable(type, fresh, editor)`
+  (with `.preview`, `.freshCall`, `.writtenAs(call)`), `Types.enumType(type, editor)` (fresh = the first
+  constant), `Types.record(Class)` (a record's canonical constructor: parts, components and build all derived,
+  so `build(components(v))` equals `v` by construction) and `Types.call(type, factory, components, build)`
+  (parts derived from the factory, a varargs tail as its element type; `.constants(Field...)`). The lookups
+  `method`, `constructor`, `constant` and `parts`, and the part readers `whole`, `count`, `number`, `text`,
+  `flag`, `part`, `each`, are public here — every plugin had its own copy. An editor is passed as
+  `() -> MyEditors::point` (`Types.Drawn`): the outer lambda links no JavaFX, so a headless host can still
+  build the type list.
+- **`Modals.owner(services)`**: the window a plugin's own window belongs to, or `null` — the SDK spelled
+  `services.dialogs().ownerWindow().orElse(null)` seventeen times.
+- **`AbstractStudioPlugin.buildComponentTypes()` and `buildManagedValues()`**, memoised like the other hooks.
+
 - **`ManagedHandle<T>`**: one `@Managed` value, read and written from a plugin's window with no id spelled
   and no cast — `open`, `openOrCreate` (asks the host for the holder first), `read` (a `T`), `readable`,
   `write` (creates when missing; answers the sentence to show, or null). Every step is total.
@@ -24,6 +37,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   a test catches an editor that ignores the range.
 
 ### Changed
+
+- **`Styles` implements the contract's `StyleClasses`** and declares no name of its own; every constant is
+  still reachable as `Styles.X`.
+- **`AbstractPluginType`'s part readers delegate to `Types`.**
 
 - **`AbstractPluginType` does not implement `EditableType`** (contract 0.3.0), and its example says so: a
   subclass that draws its type adds `implements EditableType<T>`.

@@ -45,6 +45,15 @@ public final class Modals {
     private Modals() {}
 
     /**
+     * The window a plugin's own window should belong to — the editor's — or {@code null} when there is none
+     * (a headless host, or no services at all). {@code Stage.initOwner(null)} is legal, so the answer can be
+     * passed straight on.
+     */
+    public static javafx.stage.Window owner(StudioServices services) {
+        return services == null ? null : services.dialogs().ownerWindow().orElse(null);
+    }
+
+    /**
      * Any body at all, in a themed and owned window with <i>OK</i> and <i>Cancel</i> under it.
      *
      * <p>The general case of the two below, and the reason it is public: an editor whose modal is a slider, a
@@ -523,7 +532,7 @@ public final class Modals {
         stage.setTitle(title);
         stage.setScene(services == null ? new javafx.scene.Scene(root) : services.theme().scene(root));
         if (services != null) {
-            javafx.stage.Window owner = services.dialogs().ownerWindow().orElse(null);
+            javafx.stage.Window owner = owner(services);
             if (owner != null) {
                 stage.initOwner(owner);
                 stage.initModality(Modality.WINDOW_MODAL);
