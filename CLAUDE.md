@@ -4,7 +4,11 @@ Guidance for working in **botmaker-plugin-toolkit**, the widget kit a BotMaker S
 against.
 
 Read the umbrella `../CLAUDE.md` first, `../botmaker-studio-api/CLAUDE.md` for the contract this sits on,
-and `../docs/refactor/24-plugin-platform.md` for why either exists.
+and `../docs/refactor/24-plugin-platform.md` for why either exists. This file states what is true now. What
+was here and went — the `config` package and its grammar, `CallSites`, `Codecs`, `Source`, `Types`,
+`AbstractStudioPlugin`, `AbstractPluginType`, JavaPoet — and why, is in
+`../docs/refactor/31-umbrella-history.md` (*toolkit*); the text this file carried until 2026-09-28 is
+`git show 45a5ea9:CLAUDE.md` in this repository.
 
 ## What this module is, and what it is not
 
@@ -18,85 +22,49 @@ reason there are two modules:
 A plugin takes a new toolkit without taking a new contract. That is the property to protect; if a change
 here would force the contract to move with it, the change is in the wrong module.
 
-## It was two halves for one day, and it is a widget kit again
+**A class here must be a *widget or a shape*, useful to a plugin that has no vocabulary of its own.** If it
+needs types to mean anything, it belongs to the plugin that owns them. That is the rule that sent the
+parameter grammar to `botmaker-plugin-basics` and plugin declaration to the contract's steps, and it is the
+rule for the next thing proposed.
 
-On 2026-09-09 this module grew `com.botmaker.plugin.toolkit.config` — `Settings`, `ProjectValues`,
-`ValueGrammar`, how a *running bot* reads its own parameters — with `jackson-databind` beside it, and lost
-both the same evening to **`botmaker-plugin-basics`**. Nothing of it is here now. The lineage is worth
-carrying, because every step of it was right about the step before:
+**Only the SDK's plugin half (`plugin/`, held by the SDK's `PluginLayersTest`) may name a toolkit class.** A
+library half that reached for a plugin's widget kit would be unusable in every host that does not bundle
+one — which, since Studio bundles no plugin, is every host.
 
-- They were `botmaker-shared`'s from 2026-09-07, which made a plugin shipping nothing but a value type and
-  its grammar depend on JNA, `jna-platform`, OpenCV and dadb to reach a four-method interface. **There is no
-  link between reading a parameter and matching an image.**
-- They came here because **this is an artifact that reaches a bot**: a plugin declares the toolkit at
-  `compile` scope, so it travels with that plugin onto the classpath of every bot that uses it, while the
-  contract is `provided` and so absent from a bot, and the SDK holding them made reading a value a privilege
-  of plugin #1.
-- **They left because a widget kit owns no value types.** The mechanism belongs with somebody who has a
-  vocabulary to read; here it could only be held under a standing promise never to use it (*this module
-  ships no grammar, or it becomes a vocabulary*), and it made a plugin that wanted to read one parameter
-  resolve a widget kit and a JSON parser to do it. `botmaker-plugin-basics` is a plugin, owns the nine JDK
-  value types, ships `BasicsGrammar` for them, and reaches a bot through the SDK's own `compile`-scope
-  dependency on it.
+**It is the PLUGIN's dependency and never the host's — `botmaker-studio` must not list it.** `PluginLoader`
+resolves the toolkit child-first, so a host copy would not deny a plugin its own version; the reason is that
+**there is no plugin a host copy helps and one it silently mis-serves**. `botmaker-cli`'s `pom-scopes`
+refuses a `provided` toolkit and passes a plugin that declares none, so a plugin either brings its own at
+`compile` — what `botmaker-plugin-archetype` generates — or uses no widget of ours. A host fallback would only
+rescue the plugin the registry rejects, and would bind it to the host's toolkit version, converting an
+honest failure to load into a `NoSuchMethodError` at whichever method moved. **No Studio source may name a
+`com.botmaker.plugin.toolkit` type** (`StudioSourcesTest`, which scans source rather than the classpath).
 
-**The rule to apply to the next thing proposed for this module is the one that removed those:** a class here
-must be a *widget or a shape*, useful to a plugin that has no vocabulary of its own. If it needs types to
-mean anything, it belongs to the plugin that owns them.
+**What both sides need goes in the contract, not here.** The one thing a plugin's widgets and Studio's own
+genuinely shared was the style-class names; they are the contract's `StyleClasses`, `Styles` implements it,
+and Studio's `StyleClassesTest` holds the stylesheet to it. Ask the next such thing *is the host the only
+possible source?* before anyone proposes Studio take this module.
 
-**And the rule on the SDK's side is unchanged, with its exception moved house**: *only the SDK's plugin half
-(`plugin/`, held by the SDK's `PluginLayersTest` since 2026-09-23) may name a toolkit **widget***. `api/config/Settings` is a library-half
-class, and what it names is another plugin's API (`com.botmaker.plugin.basics.store`) rather than anything
-here.
+## What is in here
 
-**It is the PLUGIN's dependency and never the host's — `botmaker-studio` must not list it.** That rule
-stood, was struck on 2026-08-28, and was restored on 2026-09-02. The round trip is worth carrying, because
-the argument that struck it is correct and will be made again.
+| class | what it is |
+|---|---|
+| `Editors` | whole editors: `tuplePill`/`tupleLabel` (a few whole numbers, picked on screen or typed — a `TupleSpec` says the labels and reading order, `Pick` which numbers a drag or click yields), `boundedPill` (a number with a range, in a dialog, committed on OK — `NumberRange`), `flag`, `text`, `program` (browse-or-type for an executable), `choiceSlot` (a dropdown over a set that moves: a `Supplier` read when the list opens, and editable, because a name that does not exist yet is a real and often deliberate state) |
+| `Pills` | the pill: `bare` + `onOpen` (a menu rebuilt on each open), `button`, `icon`, `item`, `separator`, `value` (placeholder styling when unset) |
+| `Fields` | `committing` (a text field that commits on Enter *and* on focus loss) and `stepped` (▲/▼, the arrow keys and the wheel over a field, Shift reported; what a step means is the caller's) |
+| `Modals` | a themed, owned window: `form` (any body, OK/Cancel, or Close for a body that has written already), `gallery` (a searchable grid scanned off the FX thread, with an optional typed row — `Gallery`, `Thumbnail`), `owner` |
+| `Values` | reading a JDK value off a `ValueContext` with a fallback, `setNumber` (writes as the declared type), `labelOr`. Degrades, never throws |
+| `Slots` | the value as **written**, for an expression nothing can decode: `raw`, `isEmpty`, `sourceOr` (the second half of every pill label) |
+| `Styles` | the contract's `StyleClasses`, applied (`on`), plus `UNTHEMED`, an opt-out for a translucent surface over a live game |
+| `ScreenPicks`, `Region` | the screen pick a tuple pill asks its plugin for: **the shape is the toolkit's and the pixels are the plugin's**. Passed to the widget, never registered in a static |
+| `ZoomPan` | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a pane and a content group — a gesture, which is the definition of a shape |
+| `ManagedHandle` | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window; the type comes from the plugin's own `ManagedValue<T>` |
+| `testing.TestContexts` | a recording `SlotContext`/`ValueContext`, so an editor **and its predicate** can be unit-tested. `withRun` enforces `minimum()` exactly as the host does, so a test can assert an editor honours the floor |
 
-The original wording was *"Two plugins are entitled to two toolkit versions on two classloaders, and the
-moment Studio resolves one, they are not."* **The second sentence is false**, and nobody should restore it:
-`PluginLoader` is parent-first only for `com.botmaker.plugin.api.**` and the platform namespaces, so the
-toolkit is resolved **child-first** — a plugin carrying its own copy still gets its own.
-
-It was struck for a real bug. Studio's plugin #1 was the SDK, whose `SdkPlugin` extends
-`AbstractStudioPlugin` through a dependency the SDK declares `optional` — so not transitive, so Studio's
-classpath had no toolkit at all, so `ServiceLoader` threw `NoClassDefFoundError` while constructing the only
-plugin Studio shipped and **Studio ran with an empty palette**. Studio took a `runtime`-scoped toolkit under
-the replacement rule *whoever puts a plugin on a classpath supplies what that plugin needs*.
-
-**On 2026-09-02 Studio stopped bundling a plugin, and that rule stopped applying**: Studio puts no plugin on
-any classpath, so it supplies nothing. The dependency survived one further day on *"the fallback copy for a
-plugin that brings none"*, and **that is the claim to refuse.** Read `botmaker-cli`'s `pom-scopes` check: it
-**refuses** a `provided` toolkit and **passes** a plugin declaring no toolkit at all. So a plugin either
-brings its own at `compile` scope — which is what `botmaker-plugin-archetype` generates — or uses no widget
-of ours and needs nothing. There is no third plugin for a fallback to serve; the only one it would rescue is
-the one the plugin registry rejects, and rescuing it would bind that plugin to **the host's** toolkit version
-rather than the one it compiled against, converting an honest failure to load into a `NoSuchMethodError`
-deferred to whichever method moved.
-
-So the rule is the original one with the false clause replaced by the true one: **not because a host copy
-denies a plugin its own version (it does not), but because there is no plugin it helps and one it silently
-mis-serves.**
-
-**What both sides need goes in the contract, not here (2026-09-28).** The one thing a plugin's widgets and
-Studio's own genuinely shared was the style-class names; they are the contract's `StyleClasses` now,
-`Styles` implements it, and Studio's `StyleClassesTest` holds the stylesheet to it. A second such thing
-should be asked the same question — *is the host the only possible source?* — before anyone proposes Studio
-take this module.
-
-Enforced regardless, and unchanged throughout: **no Studio source may name a `com.botmaker.plugin.toolkit`
-type.** `StudioSourcesTest` scans Studio's *source* rather than its classpath, which is what keeps it a real
-test now that the way to break the rule is to add the dependency back rather than widen a scope.
-
-## What is in here, after the 2026-08-28 lift
-
-Seven widget classes (`Editors`, `Pills`, `Fields`, `Modals`, `Values`, `Styles`, `Thumbnail`) and three
-more that are not widgets at all:
-
-| class | what it is | why it is here and not in a plugin |
-|---|---|---|
-| `Slots` | the value as it is **written**, for an expression nothing can decode | `raw`, `isEmpty`, and `sourceOr` (2026-09-28, the second half of every pill label); see *No plugin parses anything* below |
-| `ManagedHandle` (2026-09-28) | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window | every plugin with a value wrote the same four steps by hand, once per value; it names no plugin's word — the type comes from the plugin's own `ManagedValue<T>` |
-| `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
+**The split each time is *shape versus table*.** `tuplePill` is the SDK's three geometry editors written once;
+the SDK keeps three `TupleSpec` constants, and what is in them is exactly what could not move: that a `Rect`
+is an origin plus a size and reads `10, 20  640×480`. `boundedPill` is a shape; the table saying a match's
+confidence runs 0 to 1 is the SDK's and stayed.
 
 ## The audit of 2026-09-28: every member has a caller
 
@@ -118,110 +86,32 @@ a plugin under rule 4 below, and a second plugin is who they are for).
 - **Kept with no plugin caller**: `ManagedHandle.value()` (the accessor of what the handle holds) and
   `TestContexts.Recording.withType`/`withBounds` — a test kit sets every part of the context an editor can
   read, whether or not a test has asked yet.
-- **Lifted, because both plugins wrote them**: `Fields.stepped` (▲/▼, the arrow keys and the wheel over a
-  field, Shift for ten — `Modals.tuple` and basics' number field, whose copies had drifted: one read Shift
-  on the buttons and ignored the arrow keys, the other the reverse) and `Slots.sourceOr` (the expression as
-  written, else a prompt — ten hand-written copies across both plugins). What a step *means* stays with the
-  caller.
+- **Lifted, because both plugins wrote them**: `Fields.stepped` (`Modals.tuple` and basics' number field,
+  whose copies had drifted: one read Shift on the buttons and ignored the arrow keys, the other the reverse)
+  and `Slots.sourceOr` (ten hand-written copies across both plugins).
 - **Considered and not lifted**: the "button pill that opens `Modals.form`, writes, relabels" pattern (six
   sites) — its body, its commit rule and its label differ at every site, and a helper would take three
   lambdas to save one array; the `java.awt.Color` ↔ JavaFX conversions (three lines, and naming
   `java.awt` here for them is not a shape); the two plugins' `trim(double)` (they round differently, on
-  purpose); the SDK's ⚙ Bot Settings spinners (a form of five typed settings, not `Fields.integer`'s
-  single-value shape).
+  purpose); the SDK's ⚙ Bot Settings spinners (a form of five typed settings, not a single-value shape).
 
-**Declaring a plugin and its types left this module on 2026-09-28.** `AbstractStudioPlugin` (memoised
-`build…` hooks), `AbstractPluginType` (a class plus part readers) and `Types` (one expression per type, the
-`method`/`constructor`/`constant` lookups by name, the part readers) were the toolkit's way to declare, and a
-plugin had to know them to write the obvious thing. The contract's steps replace all three —
-`StudioPlugin.id(…)` on `DeclaredPlugin`, `PluginType.value(…)`, `ComponentType.part(…)`, factories as method
-references — so a plugin declares with no toolkit at all, and names no method by string
-(`../botmaker-studio-api/CLAUDE.md`, *the declaration steps*). `Types` had lived five days.
+## The rules
 
-**`CallSites` and `Codecs` were here and are deleted (2026-09-22).** `CallSites` is
-`SlotEditor.forCall`/`forType` on the contract — 116 lines of `Predicate<ValueContext>` construction with no
-JavaFX in it, and *which slot an editor claims* is contract vocabulary, the same argument that put
-`SlotEditor.of` there. (Both went on 2026-09-28 for `SlotEditor.onParameter`/`forType`/`when` steps: a call
-site is an annotation on the parameter, not a method named by string.) `Codecs` went with `ValueCodec`: its
-`ofEnum`, `or` and `seeded` had **zero callers
-anywhere in the repository**, and the four string methods they built stopped being read when storage stopped
-being text.
-
-**`TestContexts` gained `withRun` on 2026-08-31**, for the contract's new `SlotRun`. It records what an
-editor writes to a run *and enforces `minimum()` exactly as the host does* — a `replace` with too few
-elements leaves the elements alone and counts no write — so a test can assert that an editor honours the
-floor rather than trusting it. `siblingRun()` is empty without it, which is what nearly every real slot
-answers and therefore the case an editor must handle first. `SlotRunTest` holds those cases. Since
-2026-09-23 a run is values (`SlotRun.Element`), and `TestContexts` records values only.
-
-**`Source` was here from 2026-08-28 to 2026-09-23** — a string literal, a type's name, a method-name check,
-for the SDK's macro recorder, whose statements a user pasted. Recording is the host's now and no plugin writes
-Java, so it is deleted with `SourceTest`.
-
-| `ZoomPan` (2026-08-30) | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a `Pane` and a content `Group` | it names no capture target, no colour and nothing of any plugin's API — it is a gesture, which is the definition of a shape. Written in Studio, held in the SDK for two slices because Studio source may not name a toolkit type, and moved the moment both its callers were the SDK's |
-
-**`Styles.UNTHEMED` arrived with `ZoomPan` and is the first style class here that is an *opt-out*.** The host
-themes a plugin's windows for it, so a translucent surface drawn over a live game — where the shell's
-background, border and radius are the one thing that would ruin it — has to be able to say no. It is a
-marker with no properties of its own, so a host that does not recognise it simply themes the window as usual.
-
-`Editors` gained `boundedPill` (a number with a range, in a dialog, committed on OK) and `flag` out of the
-same lift. **What did not move is the `Bound` table** naming `setDefaultConfidence` and what its range is —
-that is the SDK's knowledge about its own API, and it is the worked example of rule 4 below.
-
-**Later the same day it gained three more, and the split each time is *shape versus table*.**
-`tuplePill(ctx, TupleSpec)` is the SDK's three geometry editors written once — a pill over a few whole
-numbers, a way to take them off the screen (`Pick.REGION`/`POINT`/`MEASURE`/`NONE`, all of them host
-capabilities), a dialog to type them. The SDK keeps three `TupleSpec` constants, and what is in them is
-exactly what could not move: that a `Rect` is an origin plus a size and reads `10, 20  640×480`.
-`Slots.holdsNumbers` moved with it, because *is this value coordinates at all, or is it `target.center()`*
-is a question about source text. **`choiceSlot(ctx, options, prompt)` arrived on 2026-08-30 and is the pair to `choice` that `textSlot` is to
-`text`** — it writes through `Slots`, so the value is a Java string literal in a bot's source and the
-characters themselves in a Parameters row. Two things in it are the shape rather than a preference: the
-options are a `Supplier` read when the list opens (a set that moves — `gallery`'s rule), and the box is
-**editable**, because a value naming something that does not exist yet is a real and frequently deliberate
-state, and an editor that could only pick from what exists would make it unsayable. Its one caller today is
-the SDK's activity/outcome pair, and the vocabulary — *which* names, and the prompts — stayed there.
-
-`program(ctx, prompt)` is browse-or-type for an executable, and `text(ctx, prompt, columns)` is the field —
-the SDK's `LaunchEditors` keeps `game()`, its cover art, and the two prompts, which are the only sentences
-in it that know what a launch call is.
-
-**The `text`/`textSlot` and `choice`/`choiceSlot` pairs collapsed to one each on 2026-09-22.** They existed
-because one half wrote the characters and the other wrote a Java string literal — two encodings of one
-value, which is the thing that change exists to remove.
-
-**The SDK is a library *and* a plugin, and only its plugin half (`plugin/`) may name
-us.** A library half that reached for a plugin's widget kit would be unusable in every host that does not
-happen to bundle one — which, since Studio stopped bundling any plugin at all, is **every host without
-exception**. (That is why the SDK's `LiteralWriter` kept its own escaping rather than using `Source`; both
-are deleted since 2026-09-23.)
-
-## The three rules
-
-**1. A widget takes a `ValueContext` and gets everything else from it.** Not a `CodeEditorService`, not a
-`ProjectConfig`, not a `Stage` the caller found somewhere. `ctx.services()` is theming, capture, dialogs and
-the project's paths, and it is the only door. A widget that needs something not on `StudioServices` is
-telling you the *contract* is missing something — say so, do not route around it.
+**1. A widget takes a `ValueContext` and gets everything else from it.** Not a `Stage` the caller found
+somewhere. `ctx.services()` is theming, dialogs and the project's paths, and it is the only door. A widget
+that needs something not on `StudioServices` is telling you the *contract* is missing something — say so, do
+not route around it.
 
 **2. Nothing throws while building a node.** `ValueContext.value` answers **empty** for anything the host's
 grammar could not decode — a variable, a computed initializer, `target.center()` — and that is a normal
 state, not a failure path. `Values` degrades to the caller's fallback in every case, on purpose. An editor
-that throws in its constructor leaves a row of the Parameters window with no widget in it and no explanation
-— which reads as the host being broken.
+that throws in its constructor leaves a row of the Parameters window with no widget in it and no
+explanation — which reads as the host being broken.
 
-**2b. No plugin parses or writes anything (2026-09-22, finished 2026-09-23).** There is no `Slots.arguments`
-(it outlived the rest by a day, for the enclosing call the contract no longer hands over), no `Slots.ints`, no
-`Slots.stringLiteral` and no `Slots.holdsNumbers`. Those existed because `ValueContext` handed over a
-`String` of Java, so every editor parsed it — which produced three numeric-literal strippers, two argument
-splitters and one string unescaper across two modules, none agreeing with the host's. Read the value with
-`ValueContext.value(Class)` and write one with `set(Object)`. `Slots.raw` survives for exactly one purpose:
-**showing** an expression `value()` could not decode, so the user sees what is in their file.
-
-*`holdsNumbers` is deliberately not reimplemented.* "Is this value numbers at all, or is it
-`target.center()`" is exactly "did `value()` answer", asked by the thing that knows — and the old one
-required `startsWith("new ")`, so `Point.of(1, 2)` read as not-numbers while `new Point(a, b)` labelled a
-pair of variables `0, 0`.
+**2b. No plugin parses or writes Java.** Read the value with `ValueContext.value(Class)` and write one with
+`set(Object)`. `Slots` exists only to **show** an expression `value()` could not decode, so the user sees what
+is in their file. *"Is this value numbers at all, or is it `target.center()`"* is exactly "did `value()`
+answer", asked by the thing that knows — never reimplement it here.
 
 **3. Building an editor never writes.** Not even to normalise what is already there. A project opened and
 closed must come back byte-identical, and a widget that "tidies" a value on render rewrites every bot the
@@ -229,81 +119,35 @@ user merely looked at.
 
 **4. Nothing here may name a plugin's vocabulary.** Not in a signature, not in a name, not in a javadoc
 sentence. If a member has to say "Steam", "duration", "capture source" or "confidence", it belongs to the
-plugin that owns that word. `Fields.duration` is the worked precedent — it returns a `long` and draws no
-preview label, because spelling a total back out is the wire format owner's job, and `WireText.spellDuration`
-stayed in the SDK. `Editors.NumberRange` passes because a *bounded number* is a shape; the table saying
-`setDefaultConfidence` runs 0 to 1 does not, and stayed.
+plugin that owns that word. **A widget that is generic only because its one caller happens to be generic is
+not generic.** This is the acceptance test for every lift out of a plugin, and it is what stops this module
+becoming the SDK's second home.
 
-This is the acceptance test for every lift out of a plugin, and it is what stops this module becoming the
-SDK's second home. A widget that is generic only because its one caller happens to be generic is not generic.
+## No dependency at all
 
-## No dependency at all, and how it got back there
+`botmaker-studio-api` and `javafx-controls` are `provided` — a plugin has both already — and there is nothing
+else. `mvn dependency:tree` shows no `compile` entry: a plugin author cannot get a version conflict out of
+this module. The bar for adding one is that *it becomes every plugin's dependency, and its compatibility
+becomes ours*. ControlsFX was weighed and declined on that bar (`PropertySheet` is a whole-form abstraction
+and these are bespoke single-value nodes); if a later need wants `PopOver` specifically, take the dependency
+**then**, with the need in hand.
 
-`botmaker-studio-api` and `javafx-controls` are `provided` — a plugin has both already — and since
-2026-09-22 **there is nothing else**. `mvn dependency:tree` shows no `compile` entry: a plugin author cannot
-get a version conflict out of this module.
+## Why it flattens
 
-**JavaPoet was here from 2026-08-28 to 2026-09-22**, and it was the only dependency a plugin ever resolved
-through this module. The bar it had to clear is the one this section has always stated: *it becomes every
-plugin's dependency, and its compatibility becomes ours.* What cleared it at the time was that **a plugin
-wrote Java whether it meant to or not** — `ValueCodec.literal` returned Java source and `Slots.write` wrote
-an expression into a bot's file — so the choice was never "a dependency or nothing", it was "one
-implementation or a hand-rolled escaper per plugin".
-
-**What removed it is that the premise stopped being true.** A value crosses as a value now and the host
-spells it, through the plugin's own `ComponentType`. What was left of `Source` used JavaPoet for two things:
-`CodeBlock` joining a constructor's arguments, which lost its last caller, and `ClassName.get(Class)`
-spelling a nested type `Outer.Inner` rather than `Outer$Inner` — which is `Class.getCanonicalName()`, and is
-what `ClassName.get` reads too.
-
-**The escaping argument kept `Source.string` until 2026-09-23**, for the SDK's macro translator, whose
-recording was *statements a user pastes*. The host writes a recording now, from a plugin's `@Records`
-methods, and `Source` is deleted. The history below is why each of its members was shaped as it was.
-
-**`Source.call` was deleted on 2026-09-04, and the reason is the rule to apply to the next member proposed
-here.** It composed `Type.method(a, b)` and checked the method name reflectively, and it had **no production
-caller in its whole life**: the one place that wanted it — the SDK's `MacroTranslator` — declined it, because
-a recorded macro is text somebody reads before pasting into a file where the type is already imported, and
-`call` qualifies the type in full. A member with one candidate caller that refuses it is a member whose shape
-was guessed. What survives is `Source.requireMethod`, which is the half that was actually used, called
-directly by that translator.
-
-**A compile-checked method reference was raised as the replacement and is not possible.** `call(Mouse::click)`
-binds to a functional interface whose *shape matches the method*, so arbitrary arity needs one interface per
-parameter count — precisely the `MemberRef` + `M0`–`M5` apparatus built for `PaletteCatalog` and deleted on
-2026-08-27, and a method reference still cannot name a specific overload. There is no arity-free form. Both
-`Source`'s javadoc and this paragraph say so, because the idea is a good one and will be had again.
-
-**`Source.string` is the one member JavaPoet never implemented correctly for this use**, and that is pinned
-by a test rather than left to be rediscovered: `$S` splits a string containing a newline into a
-concatenation *across source lines*, which is right for a generated file and wrong here, where the result
-goes into the middle of an existing line. **No JavaPoet type ever appeared in a signature here**, which is
-what made removing the library a non-event for every plugin compiled against it.
-
-ControlsFX was considered and declined on the same bar and did not clear it: `PropertySheet` is a whole-form
-abstraction and these are bespoke single-value nodes, so it would sit unused beside them while every plugin
-that wanted a slider resolved it. If the toolbar or panel work later wants `PopOver` specifically, take the
-dependency **then**, with the need in hand.
-
-## Why it flattens and the other two plugin-facing modules do not
-
-`botmaker-studio-api` and `botmaker-plugin-processor` run no `flatten-maven-plugin` and carry no
-`.deps.env`, because both exist to bake a `-D`-injected `${botmaker.*.version}` into a published pom and
-neither module pins a BotMaker upstream. **This one does** — the contract, whose `ValueContext` every widget
-takes. So it gets both, exactly like `botmaker-session` and `botmaker-sdk`, and for the reason their headers
-give: Maven publishes the *committed* pom, not the effective one, so without flatten a `-D` changes what
-this build resolves and nothing about what a plugin resolving this toolkit from JitPack sees. That is the
-shape of the `0.0.0-SNAPSHOT` bug that shipped in every SDK up to v1.0.24.
-
-`flattenMode=oss` with `<repositories>keep</repositories>`: `oss` strips the jitpack repository declaration
-otherwise, and a consumer resolving a `com.github.LiQiyeDev` artifact needs it.
+This module pins a BotMaker upstream — the contract, whose `ValueContext` every widget takes — so like
+`botmaker-session` and `botmaker-sdk` it runs `flatten-maven-plugin` and carries `.deps.env`: Maven publishes
+the *committed* pom, not the effective one, so without flatten a `-D` changes what this build resolves and
+nothing about what a plugin resolving this toolkit from JitPack sees. `flattenMode=oss` with
+`<repositories>keep</repositories>`: `oss` strips the jitpack repository declaration otherwise, and a consumer
+resolving a `com.github.LiQiyeDev` artifact needs it.
 
 ## Style
 
 `../docs/refactor/00-conventions.md` applies, and so does the contract's own rule that **Javadoc is the
 deliverable**: a plugin author has this module's Javadoc and nothing else. Every widget's doc says which
 mistake it exists to prevent — that a bare `TextField` loses edits made by clicking away, that an unowned
-`Stage` falls behind the editor — because those are the things the author cannot find out any other way.
+`Stage` falls behind the editor, that a native file dialog blocks its thread — because those are the things
+the author cannot find out any other way.
 
 ## Building
 
