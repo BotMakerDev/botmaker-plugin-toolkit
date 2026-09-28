@@ -21,8 +21,8 @@ public record Thumbnail(String value, String label, Image image) {
         label = label == null || label.isBlank() ? value : label;
     }
 
-    /** A cell with no picture — the label alone. */
-    public static Thumbnail of(String value, String label) {
+    /** A cell with no picture — the label alone: what a gallery's typed row answers. */
+    static Thumbnail of(String value, String label) {
         return new Thumbnail(value, label, null);
     }
 }

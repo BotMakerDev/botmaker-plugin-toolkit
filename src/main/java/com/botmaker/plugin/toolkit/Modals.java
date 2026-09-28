@@ -79,51 +79,17 @@ public final class Modals {
     }
 
     /**
-     * A row of labelled whole-number fields — {@code x}, {@code y}, {@code width}, {@code height} — with
-     * <i>OK</i> and <i>Cancel</i>.
-     *
-     * <p>{@code onCommit} receives one value per label, in the same order, with anything unparsable read as
-     * {@code 0}. It is not called if the user cancels or closes the window.
-     */
-    public static void numbers(ValueContext ctx, String title, String[] labels, int[] initial,
-                               Consumer<int[]> onCommit) {
-        String[] names = labels == null ? new String[0] : labels;
-        HBox row = new HBox(8);
-        row.setAlignment(Pos.CENTER_LEFT);
-        TextField[] fields = new TextField[names.length];
-        for (int i = 0; i < names.length; i++) {
-            fields[i] = Styles.on(new TextField(Integer.toString(
-                    initial != null && i < initial.length ? initial[i] : 0)), Styles.INSET_FIELD);
-            fields[i].setPrefColumnCount(5);
-            VBox cell = new VBox(2, Styles.on(new Label(names[i]), Styles.CAPTION), fields[i]);
-            row.getChildren().add(cell);
-        }
-
-        Stage stage = new Stage();
-        Runnable commit = () -> {
-            int[] out = new int[fields.length];
-            for (int i = 0; i < fields.length; i++) out[i] = parseInt(fields[i].getText());
-            stage.close();
-            if (onCommit != null) onCommit.accept(out);
-        };
-
-        VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), row,
-                buttons(commit, stage::close)), Styles.DIALOG_COMPACT);
-        show(ctx, stage, title, root);
-    }
-
-    /**
-     * The numbers of a thing on the screen — a point, a size, a rectangle — each with a ▲/▼ stepper (arrows
-     * and the wheel too; Shift steps by ten), a drawing of it to scale beside them, and for a rectangle where
-     * it ends. Pasting {@code "x, y"} or {@code "x, y, w, h"} into any field fills them all. OK hands
-     * {@code onCommit} one value per label; Cancel hands it nothing (feedback 2, 2026-09-27 — this was a row of
-     * bare fields, {@link #numbers}).
+     * The numbers of a thing on the screen — a point, a size, a rectangle — each a {@link Fields#stepped}
+     * field (Shift steps by ten), a drawing of it to scale beside them, and for a rectangle where it ends.
+     * Pasting {@code "x, y"} or {@code "x, y, w, h"} into any field fills them all. OK hands {@code onCommit}
+     * one value per label; Cancel hands it nothing (feedback 2, 2026-09-27 — this was a row of bare fields,
+     * {@code numbers}, deleted with no caller on 2026-09-28). {@link Editors#tuplePill}'s, and package-private.
      *
      * @param shape which drawing: {@link Editors.Pick#POINT} a point on a grid, {@link Editors.Pick#MEASURE} a
      *              box, anything else with four numbers a rectangle in its frame
      */
-    public static void tuple(ValueContext ctx, String title, String[] labels, int[] initial, Editors.Pick shape,
-                             Consumer<int[]> onCommit) {
+    static void tuple(ValueContext ctx, String title, String[] labels, int[] initial, Editors.Pick shape,
+                      Consumer<int[]> onCommit) {
         String[] names = labels == null ? new String[0] : labels;
         int[] values = new int[names.length];
         for (int i = 0; i < values.length; i++) values[i] = initial != null && i < initial.length ? initial[i] : 0;
@@ -160,31 +126,9 @@ public final class Modals {
                 values[at] = parseInt(is);
                 redraw.run();
             });
-            Runnable up = () -> field.setText(Integer.toString(TupleFields.step(values[at], 1, false)));
-            field.setOnKeyPressed(e -> {
-                int direction = switch (e.getCode()) {
-                    case UP -> 1;
-                    case DOWN -> -1;
-                    default -> 0;
-                };
-                if (direction == 0) return;
-                field.setText(Integer.toString(TupleFields.step(values[at], direction, e.isShiftDown())));
-                e.consume();
-            });
-            field.setOnScroll(e -> {
-                if (e.getDeltaY() == 0) return;
-                field.setText(Integer.toString(TupleFields.step(values[at], e.getDeltaY() > 0 ? 1 : -1,
-                        e.isShiftDown())));
-                e.consume();
-            });
-            Button plus = Pills.icon("▲", up);
-            Button minus = Pills.icon("▼",
-                    () -> field.setText(Integer.toString(TupleFields.step(values[at], -1, false))));
-            plus.setFocusTraversable(false);
-            minus.setFocusTraversable(false);
             grid.add(Styles.on(new Label(names[i]), Styles.CAPTION), 0, i);
-            grid.add(field, 1, i);
-            grid.add(new HBox(2, plus, minus), 2, i);
+            grid.add(Fields.stepped(field, (direction, shift) ->
+                    field.setText(Integer.toString(TupleFields.step(values[at], direction, shift)))), 1, i);
         }
         Label hint = Styles.on(new Label("Arrows or the wheel step by 1, with Shift by 10. Paste \"x, y\" to "
                 + "fill every field."), Styles.DIALOG_HINT);
@@ -253,38 +197,6 @@ public final class Modals {
     }
 
     /**
-     * A scrolling grid of pictures, one of which the user picks.
-     *
-     * <p>{@code emptyMessage} is shown in place of the grid when there is nothing to choose — which is a
-     * normal state (no templates captured yet, no games found) and reads as a broken window if left blank.
-     */
-    public static void chooser(ValueContext ctx, String title, List<Thumbnail> items, String emptyMessage,
-                               Consumer<Thumbnail> onChosen) {
-        Stage stage = new Stage();
-        Parent body;
-        if (items == null || items.isEmpty()) {
-            body = Styles.on(new Label(Values.labelOr(emptyMessage, "Nothing to choose from yet.")),
-                    Styles.DIALOG_HINT);
-        } else {
-            FlowPane grid = new FlowPane(10, 10);
-            for (Thumbnail item : items) {
-                grid.getChildren().add(tile(item, () -> {
-                    stage.close();
-                    if (onChosen != null) onChosen.accept(item);
-                }));
-            }
-            ScrollPane scroll = new ScrollPane(grid);
-            scroll.setFitToWidth(true);
-            scroll.setPrefViewportHeight(360);
-            body = scroll;
-        }
-
-        VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), body,
-                buttons(null, stage::close)), Styles.DIALOG_COMPACT);
-        show(ctx, stage, title, root);
-    }
-
-    /**
      * How a {@link #gallery} is presented — everything about it except what is in it.
      *
      * <p>A record because these five travel together and four of them are strings: a call site passing them
@@ -309,19 +221,15 @@ public final class Modals {
         public static Gallery covers(String title, String emptyMessage, String manualPrompt) {
             return new Gallery(title, 120, 160, emptyMessage, manualPrompt);
         }
-
-        /** A gallery of pictures taken off a screen — square frames, and no manual entry to offer. */
-        public static Gallery pictures(String title, String emptyMessage) {
-            return new Gallery(title, 96, 96, emptyMessage, null);
-        }
     }
 
     /**
      * A searchable grid of pictures that is <b>scanned in the background</b>, with an optional row for typing
      * an answer the grid does not contain.
      *
-     * <p>The three things it has that {@link #chooser} does not are the three every real library browser in
-     * this application needed, each of which is a trap an editor author hits exactly once:
+     * <p>The three things it has that a plain grid does not are the three every real library browser in this
+     * application needed, each of which is a trap an editor author hits exactly once (the plain grid,
+     * {@code chooser}, had no caller and was deleted on 2026-09-28):
      *
      * <ul>
      *   <li><b>{@code items} is called off the JavaFX thread.</b> Listing an installed library or a folder of
@@ -471,8 +379,9 @@ public final class Modals {
      * and answering it is a decision no editor should have to make twice.
      *
      * <p>{@code onChosen} runs on the JavaFX thread with a real path, and not at all if the user cancels.
+     * {@link Editors#program}'s, and package-private since 2026-09-28: no plugin called it directly.
      */
-    public static void program(ValueContext ctx, Path initialDir, Consumer<Path> onChosen) {
+    static void program(ValueContext ctx, Path initialDir, Consumer<Path> onChosen) {
         if (ctx == null || onChosen == null) return;
         Dialogs dialogs = ctx.services().dialogs();
         Thread worker = new Thread(() -> {
@@ -487,25 +396,6 @@ public final class Modals {
         }, "toolkit-program-chooser");
         worker.setDaemon(true);
         worker.start();
-    }
-
-    /** One picture-and-caption cell. A thumbnail with no image is its caption alone, never a blank box. */
-    private static Button tile(Thumbnail item, Runnable onPicked) {
-        VBox content = new VBox(4);
-        content.setAlignment(Pos.CENTER);
-        if (item.image() != null) {
-            ImageView view = new ImageView(item.image());
-            view.setPreserveRatio(true);
-            view.setFitWidth(96);
-            view.setFitHeight(96);
-            content.getChildren().add(view);
-        }
-        content.getChildren().add(Styles.on(new Label(item.label()), Styles.TILE_NAME));
-
-        Button tile = Styles.on(new Button(), Styles.TILE);
-        tile.setGraphic(content);
-        tile.setOnAction(e -> onPicked.run());
-        return tile;
     }
 
     /** <i>Cancel</i> on the left of <i>OK</i>, right-aligned; {@code onOk} null means there is no OK. */

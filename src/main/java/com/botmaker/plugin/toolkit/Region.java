@@ -16,17 +16,4 @@ package com.botmaker.plugin.toolkit;
  * {@link ScreenPicks}, which is this module's. A record that only ever travels between a plugin and a widget
  * kit does not belong in the artifact both of them must agree on for ever.
  */
-public record Region(int x, int y, int width, int height) {
-
-    public int right() {
-        return x + width;
-    }
-
-    public int bottom() {
-        return y + height;
-    }
-
-    public boolean isEmpty() {
-        return width <= 0 || height <= 0;
-    }
-}
+public record Region(int x, int y, int width, int height) {}

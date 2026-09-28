@@ -27,29 +27,12 @@ public final class Pills {
     private Pills() {}
 
     /**
-     * A pill labelled {@code label}, whose menu is rebuilt by {@code items} each time it is opened.
-     *
-     * <p>Refreshing the label after the value changes is the caller's, through
-     * {@link MenuButton#setText(String)} — the pill cannot know when a write has landed, and the editors in
-     * {@link Editors} do it in the same callback that writes.
-     */
-    public static MenuButton menu(String label, Supplier<List<MenuItem>> items) {
-        return onOpen(bare(label), items);
-    }
-
-    /** A pill whose menu is fixed — the degenerate case of {@link #menu(String, Supplier)}. */
-    public static MenuButton menu(String label, MenuItem... items) {
-        List<MenuItem> fixed = items == null ? List.of() : List.of(items);
-        return onOpen(bare(label), () -> fixed);
-    }
-
-    /**
      * A pill with no menu yet.
      *
-     * <p>The form to reach for when the menu's entries need the pill itself — to relabel it after a write,
-     * which is what every editor in {@link Editors} does. Pair it with {@link #onOpen}. It is a separate
-     * name rather than a one-argument {@code menu} on purpose: {@code menu(label)} would also match the
-     * varargs overload above, and which one javac picks is not something a reader should have to know.
+     * <p>Pair it with {@link #onOpen}: the menu's entries need the pill itself, to relabel it after a write —
+     * the pill cannot know when a write has landed, so every editor in {@link Editors} does it in the same
+     * callback that writes. (A one-step {@code menu(label, items)} stood beside it until 2026-09-28; every
+     * caller needed the pill first, so none called it.)
      */
     public static MenuButton bare(String label) {
         return Styles.on(new MenuButton(label), Styles.PILL);

@@ -9,12 +9,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Removed
 
+- **Members no plugin called** (audit, 2026-09-28): `Editors.bounded`, `Editors.choice` (use `choiceSlot`),
+  `Fields.duration`, `Modals.numbers` (replaced by the tuple dialog), `Modals.chooser` (use `gallery`),
+  `Modals.Gallery.pictures`, both `Pills.menu` overloads (use `bare` + `onOpen`), `Region.right`/`bottom`/
+  `isEmpty`, and `ScreenPicks.color` (an implementation drops its override).
+- **No longer public**: `Fields.integer`, `Fields.bounded`, `Modals.tuple`, `Modals.program`, `Thumbnail.of`,
+  `ZoomPan.MIN_ZOOM`/`MAX_ZOOM` — each is part of a widget here and had no caller outside it.
+
 - **`Types`, `AbstractStudioPlugin` and `AbstractPluginType`.** Declaring a plugin and its types is the
   contract's now, by steps and method references: `StudioPlugin.id(…)` on `DeclaredPlugin` instead of the
   `build…` hooks, `PluginType.value(…)`/`ComponentType.part(…)` instead of `Types.editable`/`enumType`/`call`/
   `record` and the `method`/`constructor`/`constant` string lookups, `Drawn` instead of `Types.Drawn`.
 
 ### Added
+
+- **`Fields.stepped(field, step)`**: ▲/▼ beside a text field, the arrow keys and the wheel over it, Shift
+  held reported — what a step means is the caller's. The tuple dialog uses it, and its ▲/▼ now honour Shift.
+- **`Slots.sourceOr(ctx, prompt)`**: the expression as written, or `prompt` for an empty slot — the second
+  half of every pill label.
 
 - **`Types`**: a type declared as one expression instead of one class. `Types.editable(type, fresh, editor)`
   (with `.preview`, `.freshCall`, `.writtenAs(call)`), `Types.enumType(type, editor)` (fresh = the first

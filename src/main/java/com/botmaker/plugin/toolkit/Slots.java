@@ -42,6 +42,18 @@ public final class Slots {
         return raw(ctx).isBlank();
     }
 
+    /**
+     * What a pill says when the value could not be read: the expression as written, or {@code prompt} when the
+     * slot holds nothing at all.
+     *
+     * <p>The second half of every pill label, after the value's own spelling: {@code ctx.value(T.class)
+     * .map(…).orElseGet(() -> Slots.sourceOr(ctx, "Choose…"))}. Both plugins wrote it by hand, ten times,
+     * half of them testing {@code raw(ctx).isBlank()} and half {@link #isEmpty} (2026-09-28).
+     */
+    public static String sourceOr(ValueContext ctx, String prompt) {
+        return isEmpty(ctx) ? prompt : raw(ctx);
+    }
+
     // arguments(String) stood here until 2026-09-23, "for SlotContext.enclosingCall() and nothing else". The
     // enclosing call left the contract that day, and with it the last Java this module split.
 }

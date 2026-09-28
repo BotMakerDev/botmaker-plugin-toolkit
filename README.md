@@ -22,15 +22,14 @@ Ordinary `compile` scope — it is resolved onto your plugin's own classloader, 
 yours and no other plugin's. `botmaker-studio-api` and `javafx-controls` are `provided` here; you already
 have both.
 
-Then an editor is a predicate and a method reference:
+Then an editor is a method that takes a `ValueContext` and answers a `Node`, claimed by the contract's steps:
 
 ```java
-@Override
-public List<SlotEditor> slotEditors() {
-    return List.of(
-            SlotEditor.of(c -> c.type().is(Rect.class), Editors::region),
-            SlotEditor.of(c -> c.type().is(Point.class), c -> Editors.numbers(c, "Point", "x", "y")),
-            SlotEditor.of(c -> c.type().is(Duration.class), c -> Editors.bounded(c, 0, 30_000, 100)));
+// in the plugin's declaration: .editors(() -> List.of(
+//         SlotEditor.onParameter(Greetee.class).draw(() -> MyEditors::who)))
+
+public static Node who(ValueContext ctx) {
+    return Editors.text(ctx, "who to greet");
 }
 ```
 
@@ -41,37 +40,38 @@ as a `ValueContext`.
 
 | | |
 |---|---|
-| `Editors` | whole editors — `tuplePill`, `bounded`, `boundedPill`, `flag`, `text`, `program`, `choice`, `choiceSlot`, `gallery`. Take a `ValueContext`, need nothing else. |
-| `Pills` | the summary-plus-menu control nine of the host's own thirteen pickers are. |
-| `Fields` | a text field that commits on Enter *and* on blur; a clamped spinner; a slider with a read-out. |
-| `Modals` | a themed, correctly-owned numbers dialog and thumbnail chooser. |
+| `Editors` | whole editors — `tuplePill`, `boundedPill`, `flag`, `text`, `program`, `choiceSlot`. Take a `ValueContext`, need nothing else. |
+| `Pills` | the pill (`bare` + `onOpen`, `button`, `icon`) nine of the host's own thirteen pickers were. |
+| `Fields` | a text field that commits on Enter *and* on blur; `stepped`, ▲/▼ and the arrow keys and wheel over a field. |
+| `Modals` | a themed, correctly-owned window: `form` (any body, OK/Cancel), `gallery` (a searchable picture grid scanned off the FX thread), `owner`. |
 | `Values` | reading a JDK value off a `ValueContext` with a fallback, and `labelOr`. Degrades, never throws. |
-| `Styles` | the host's style-class names, as constants. |
-| `Thumbnail` | one cell of a picture chooser. |
-| `Slots` | the source of a value nothing can decode (`raw`, `isEmpty`), and `arguments` for an editor that rewrites the enclosing call. |
-| `Source` | Java a **user pastes**, spelled correctly: a string literal and a type name. |
+| `Styles` | the contract's style-class names, applied. |
+| `Thumbnail` | one cell of a gallery. |
+| `Slots` | the source of a value nothing can decode: `raw`, `isEmpty`, `sourceOr`. |
+| `ScreenPicks`, `Region` | the screen pick a tuple pill asks its plugin for. |
+| `ZoomPan` | Ctrl+scroll zoom and middle-drag pan over a pane. |
+| `ManagedHandle` | one `@Managed` value, read and written from a plugin's own window. |
 | `testing.TestContexts` | a recording context, so an editor **and its predicate** can be unit-tested. |
 
 **No editor here writes Java into a bot.** An editor is handed the value and hands one back; the host
-spells it. `Source` is for the one place a plugin still produces text a person will read — Java it offers
-to be pasted, as the SDK's macro recorder does.
+spells it.
 
-`CallSites` and `Codecs` were here until 2026-09-22: `CallSites` is the contract's `SlotEditor.forCall`,
-and `Codecs` went with `ValueCodec`.
+`CallSites` and `Codecs` went on 2026-09-22, `Source` on 2026-09-23, and every member no plugin called on
+2026-09-28 (`CLAUDE.md`, *the audit*).
 
 ## What is deliberately not in it
 
 - **No UI dependency.** ControlsFX was weighed and declined — `PropertySheet` is a whole-form abstraction
   and these are bespoke single-value nodes.
-- **No resolved dependency at all** since 2026-09-22. JavaPoet was the one, behind `Source`, and went when
-  nothing here spelled a value any more.
+- **No resolved dependency at all** since 2026-09-22. JavaPoet was the one, and went when nothing here
+  spelled a value any more.
 - **No form or validation layer.** These were extracted from the host's own pickers because they recurred;
   the next one is worth adding the day a second editor wants it, not before.
 
 ## Building
 
 ```bash
-mvn test        # ValuesTest, SourceTest, SlotRunTest, TupleLabelTest
+mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest, …
 mvn install     # com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
 ```
 

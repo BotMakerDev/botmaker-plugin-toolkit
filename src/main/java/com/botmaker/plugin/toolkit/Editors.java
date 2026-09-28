@@ -32,8 +32,8 @@ import java.util.function.Supplier;
  * public Node editor(ValueContext ctx) { return Editors.tuplePill(ctx, this, RECT, picks); }
  * }</pre>
  *
- * <p>They were extracted from the host's own thirteen pickers rather than designed, which is why there are
- * nine and not sixteen: these are the shapes that recurred.
+ * <p>They were extracted from the host's own thirteen pickers rather than designed: these are the shapes that
+ * recurred. The ones no plugin called — {@code bounded}, {@code choice} — were deleted on 2026-09-28.
  *
  * <h2>They read values, not source text (2026-09-22)</h2>
  *
@@ -57,18 +57,6 @@ public final class Editors {
     private Editors() {}
 
     /**
-     * A slider and read-out for a bounded fractional number.
-     *
-     * <p>Writes continuously as the slider moves — see {@link Fields#bounded}, and the contract's note that
-     * calling {@code set} repeatedly is expected. The number is written back as the type the field is
-     * declared as; see {@link Values#setNumber}.
-     */
-    public static Node bounded(ValueContext ctx, double min, double max, double step) {
-        double current = Values.number(ctx, min);
-        return Fields.bounded(current, min, max, step, value -> Values.setNumber(ctx, value));
-    }
-
-    /**
      * A text field that commits on Enter and on losing focus.
      *
      * <p>The value is {@code "gold.png"} in the file and {@code gold.png} in the box. There were two of
@@ -89,30 +77,10 @@ public final class Editors {
     }
 
     /**
-     * A dropdown over a fixed set.
+     * A dropdown over a set that moves, with a typeable box.
      *
-     * <p>A value the list does not contain is <b>kept and shown</b> rather than corrected: it is what the
-     * bot's source holds, and a plugin whose option set shrank between releases must not silently rewrite
-     * every bot that used the option it dropped.
-     */
-    public static Node choice(ValueContext ctx, List<String> options) {
-        List<String> items = new ArrayList<>(options == null ? List.of() : options);
-        String current = Values.text(ctx, "");
-        if (!current.isBlank() && !items.contains(current)) items.add(current);
-
-        ComboBox<String> box = Styles.on(new ComboBox<>(), Styles.INSET_FIELD_FLAT);
-        box.getItems().setAll(items);
-        if (!current.isBlank()) box.setValue(current);
-        box.valueProperty().addListener((obs, was, now) -> {
-            if (now != null && !now.equals(was)) ctx.set(now);
-        });
-        return box;
-    }
-
-    /**
-     * A dropdown over a set that moves — {@link #choice} with a supplier and a typeable box.
-     *
-     * <p>Two differences from {@link #choice}, each of them the reason this exists:
+     * <p>Two things, each of them the reason this exists (a plain fixed-set {@code choice} beside it had no
+     * caller and was deleted on 2026-09-28):
      *
      * <ul>
      *   <li><b>{@code options} is a {@link Supplier} read when the list is opened</b>, never when the node is
@@ -125,9 +93,9 @@ public final class Editors {
      *       and on losing focus, for the reason {@link Fields#committing} exists.</li>
      * </ul>
      *
-     * <p>Whatever is already in the value is kept and shown even when the supplier does not offer it, which
-     * is {@link #choice}'s rule and matters more here: the list is the project's current state and the value
-     * is what somebody wrote, and correcting the second to match the first would silently edit a bot.
+     * <p>Whatever is already in the value is kept and shown even when the supplier does not offer it: the list
+     * is the project's current state and the value is what somebody wrote, and correcting the second to match
+     * the first would silently edit a bot.
      *
      * @param prompt what the empty box says — the place to name what the list holds
      */
@@ -182,9 +150,9 @@ public final class Editors {
      *
      * <p>Whole counts get a spinner and fractions get a slider, which is {@link Fields}' own division and the
      * reason it draws them differently: 500 milliseconds is a quantity a person types, while 0.8 confidence is
-     * a position a person finds. Unlike {@link #bounded}, the value is <b>not</b> written while dragging —
-     * this shape is for a slot in a bot's source, and a slider that rewrote the file on every pixel of the
-     * drag would fill the undo stack with values nobody chose.
+     * a position a person finds. The value is <b>not</b> written while dragging — this shape is for a slot in
+     * a bot's source, and a slider that rewrote the file on every pixel of the drag would fill the undo stack
+     * with values nobody chose.
      */
     public static Node boundedPill(ValueContext ctx, NumberRange range) {
         MenuButton pill = Pills.bare(rangeLabel(ctx, range));
@@ -361,7 +329,7 @@ public final class Editors {
     public static <T> String tupleLabel(ValueContext ctx, ComponentType<T> type, TupleSpec spec) {
         return ctx.value(type.type())
                 .map(value -> spec.label().apply(ints(type.components(value))))
-                .orElseGet(() -> Slots.isEmpty(ctx) ? spec.placeholder() : Slots.raw(ctx));
+                .orElseGet(() -> Slots.sourceOr(ctx, spec.placeholder()));
     }
 
     /** The numbers currently in the value, or zeroes — the shape every geometry dialog opens on. */
@@ -420,9 +388,9 @@ public final class Editors {
      * A pill over a path to a program: the OS file chooser, or a typed path.
      *
      * <p>Typed matters as much as browsed: what a call launches is frequently a command that is not a file on
-     * this machine at all, and a chooser alone would make those unsayable. Browsing goes through
-     * {@link Modals#program}, which is where the "a native dialog blocks its thread" trap is answered once
-     * for every plugin rather than once per editor.
+     * this machine at all, and a chooser alone would make those unsayable. Browsing answers the "a native
+     * dialog blocks its thread" trap once, off the JavaFX thread, for every plugin rather than once per
+     * editor.
      *
      * <p>The label is the file's own name and not the whole path: a slot on a block is a few centimetres
      * wide, and {@code C:\Program Files (x86)\…\game.exe} elided in the middle says less than

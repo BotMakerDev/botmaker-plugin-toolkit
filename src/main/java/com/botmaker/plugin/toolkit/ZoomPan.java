@@ -36,9 +36,9 @@ import javafx.scene.transform.Translate;
 public final class ZoomPan {
 
     /** Below this the frame is smaller than the surface and there is nothing left to see. */
-    public static final double MIN_ZOOM = 0.4;
+    private static final double MIN_ZOOM = 0.4;
     /** Deliberately high: picking a single pixel out of a game frame is the point of zooming at all. */
-    public static final double MAX_ZOOM = 8.0;
+    private static final double MAX_ZOOM = 8.0;
     private static final double ZOOM_STEP = 1.1;
 
     private final Group layers;

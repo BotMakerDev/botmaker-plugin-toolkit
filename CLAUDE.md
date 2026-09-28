@@ -94,9 +94,41 @@ more that are not widgets at all:
 
 | class | what it is | why it is here and not in a plugin |
 |---|---|---|
-| `Slots` | the value as it is **written**, for an expression nothing can decode | two methods since 2026-09-22; see *No plugin parses anything* below |
+| `Slots` | the value as it is **written**, for an expression nothing can decode | `raw`, `isEmpty`, and `sourceOr` (2026-09-28, the second half of every pill label); see *No plugin parses anything* below |
 | `ManagedHandle` (2026-09-28) | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window | every plugin with a value wrote the same four steps by hand, once per value; it names no plugin's word — the type comes from the plugin's own `ManagedValue<T>` |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
+
+## The audit of 2026-09-28: every member has a caller
+
+Every public member was counted against its callers in the SDK's `plugin/`, basics and the archetype. The
+rule applied: **no caller, deleted; called only from inside the toolkit, package-private; one outside
+caller, kept when it is a shape** (the `Editors` pills, `Modals.gallery`, `ZoomPan` — each was lifted out of
+a plugin under rule 4 below, and a second plugin is who they are for).
+
+- **Deleted, no caller anywhere**: `Editors.bounded` and `Editors.choice` (`choiceSlot` is the dropdown
+  every caller wanted), `Fields.duration` (basics owns `Duration` and draws its own picker — a length of time
+  is a vocabulary), `Modals.numbers` (replaced by `tuple` on 2026-09-27), `Modals.chooser` (`gallery` is the
+  grid every caller wanted), `Modals.Gallery.pictures`, both `Pills.menu` overloads (every editor needs the
+  pill before its menu, so it is `bare` + `onOpen`), `Region.right/bottom/isEmpty`, and
+  `ScreenPicks.color` — implemented twice by the SDK and never called: a colour editor samples through its
+  own plugin.
+- **Package-private, the toolkit's own parts**: `Fields.integer` and `Fields.bounded` (`boundedPill`'s),
+  `Modals.tuple` (`tuplePill`'s), `Modals.program` (`Editors.program`'s), `Thumbnail.of`, and `ZoomPan`'s
+  zoom limits.
+- **Kept with no plugin caller**: `ManagedHandle.value()` (the accessor of what the handle holds) and
+  `TestContexts.Recording.withType`/`withBounds` — a test kit sets every part of the context an editor can
+  read, whether or not a test has asked yet.
+- **Lifted, because both plugins wrote them**: `Fields.stepped` (▲/▼, the arrow keys and the wheel over a
+  field, Shift for ten — `Modals.tuple` and basics' number field, whose copies had drifted: one read Shift
+  on the buttons and ignored the arrow keys, the other the reverse) and `Slots.sourceOr` (the expression as
+  written, else a prompt — ten hand-written copies across both plugins). What a step *means* stays with the
+  caller.
+- **Considered and not lifted**: the "button pill that opens `Modals.form`, writes, relabels" pattern (six
+  sites) — its body, its commit rule and its label differ at every site, and a helper would take three
+  lambdas to save one array; the `java.awt.Color` ↔ JavaFX conversions (three lines, and naming
+  `java.awt` here for them is not a shape); the two plugins' `trim(double)` (they round differently, on
+  purpose); the SDK's ⚙ Bot Settings spinners (a form of five typed settings, not `Fields.integer`'s
+  single-value shape).
 
 **Declaring a plugin and its types left this module on 2026-09-28.** `AbstractStudioPlugin` (memoised
 `build…` hooks), `AbstractPluginType` (a class plus part readers) and `Types` (one expression per type, the
@@ -276,8 +308,8 @@ mistake it exists to prevent — that a bare `TextField` loses edits made by cli
 ## Building
 
 ```bash
-mvn test        # ValuesTest, SlotRunTest, TupleLabelTest (19) — what is assertable with
-                # no JavaFX toolkit
+mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest,
+                # TestContextsArgumentTest (29) — what is assertable with no JavaFX toolkit
 mvn dependency:tree   # nothing at `compile`: the property to keep
 mvn install     # com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
 ```
