@@ -26,9 +26,9 @@ import java.util.Optional;
  * enough friction that the predicate half generally went untested.
  *
  * <pre>{@code
- * var ctx = TestContexts.slot(TestContexts.method(Game.class, "launchSteam"), 0, "\"440\"");
- * assertTrue(STEAM_APP_ID.test(ctx));
- * assertFalse(STEAM_APP_ID.test(TestContexts.row(String.class, "\"440\"")));
+ * var ctx = TestContexts.slot(TestContexts.method(Game.class, "launchSteam", String.class), 0, "\"440\"");
+ * assertTrue(STEAM_APP_ID.matches(ctx));
+ * assertFalse(STEAM_APP_ID.matches(TestContexts.row(String.class, "\"440\"")));
  * }</pre>
  *
  * <h2>What is real and what is not</h2>

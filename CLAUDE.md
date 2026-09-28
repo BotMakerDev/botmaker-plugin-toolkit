@@ -109,7 +109,9 @@ references — so a plugin declares with no toolkit at all, and names no method 
 **`CallSites` and `Codecs` were here and are deleted (2026-09-22).** `CallSites` is
 `SlotEditor.forCall`/`forType` on the contract — 116 lines of `Predicate<ValueContext>` construction with no
 JavaFX in it, and *which slot an editor claims* is contract vocabulary, the same argument that put
-`SlotEditor.of` there. `Codecs` went with `ValueCodec`: its `ofEnum`, `or` and `seeded` had **zero callers
+`SlotEditor.of` there. (Both went on 2026-09-28 for `SlotEditor.onParameter`/`forType`/`when` steps: a call
+site is an annotation on the parameter, not a method named by string.) `Codecs` went with `ValueCodec`: its
+`ofEnum`, `or` and `seeded` had **zero callers
 anywhere in the repository**, and the four string methods they built stopped being read when storage stopped
 being text.
 
