@@ -338,6 +338,6 @@ public final class TestContexts {
 
     /** A readable element, shown as its own {@code toString} — this module writes no Java. */
     private static SlotRun.Element element(Object value) {
-        return new SlotRun.Element(value, String.valueOf(value));
+        return SlotRun.Element.of(value, String.valueOf(value));
     }
 }
