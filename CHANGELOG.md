@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Removed
+
+- **`Types`, `AbstractStudioPlugin` and `AbstractPluginType`.** Declaring a plugin and its types is the
+  contract's now, by steps and method references: `StudioPlugin.id(…)` on `DeclaredPlugin` instead of the
+  `build…` hooks, `PluginType.value(…)`/`ComponentType.part(…)` instead of `Types.editable`/`enumType`/`call`/
+  `record` and the `method`/`constructor`/`constant` string lookups, `Drawn` instead of `Types.Drawn`.
+
 ### Added
 
 - **`Types`**: a type declared as one expression instead of one class. `Types.editable(type, fresh, editor)`

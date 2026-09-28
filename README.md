@@ -50,8 +50,6 @@ as a `ValueContext`.
 | `Thumbnail` | one cell of a picture chooser. |
 | `Slots` | the source of a value nothing can decode (`raw`, `isEmpty`), and `arguments` for an editor that rewrites the enclosing call. |
 | `Source` | Java a **user pastes**, spelled correctly: a string literal and a type name. |
-| `AbstractPluginType` | a `PluginType` that holds its class, plus `whole`/`text`/… helpers for reading `build`'s parts. |
-| `AbstractStudioPlugin` | a `StudioPlugin` that builds each contribution once, on first use. |
 | `testing.TestContexts` | a recording context, so an editor **and its predicate** can be unit-tested. |
 
 **No editor here writes Java into a bot.** An editor is handed the value and hands one back; the host

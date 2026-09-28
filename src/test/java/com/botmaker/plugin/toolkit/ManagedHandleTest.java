@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManagedHandleTest {
 
     private static final ManagedValue<String> GREETING =
-            ManagedValue.of("greeting", "Values", String.class, "hello", "Mine.");
+            ManagedValue.method("greeting").in("Values").holds(String.class, "hello").because("Mine.");
 
     /** A project holding one {@code @Managed("greeting")} String, created only when asked. */
     private static final class Project implements StudioServices, PluginValues {
@@ -89,6 +89,6 @@ class ManagedHandleTest {
     @Test
     void anOpenSetHasNoValueToHandle() {
         assertThrows(IllegalArgumentException.class,
-                () -> ManagedHandle.of(ManagedValue.openSet("pictures", "Pictures", "Mine.")));
+                () -> ManagedHandle.of(ManagedValue.openSet("pictures").in("Pictures").because("Mine.")));
     }
 }

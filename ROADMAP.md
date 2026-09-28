@@ -5,6 +5,11 @@ reasoning.
 
 ## Done
 
+### 2026-09-28 — declaring left for the contract (guided plugin declaration, phase 1)
+
+- `Types`, `AbstractStudioPlugin`, `AbstractPluginType` and `TypesTest` deleted; the contract's steps and `Ref`
+  replace them. What is left here is widgets, `ManagedHandle` and `TestContexts`.
+
 ### 2026-09-28 — `Types`, `Modals.owner`, two more build hooks (plugin authoring cleanup, phase 3)
 
 `Types` declares a type as one expression (`editable`, `enumType`, `record`, `call`) and owns the lookups and

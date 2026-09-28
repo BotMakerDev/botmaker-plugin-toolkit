@@ -89,17 +89,22 @@ test now that the way to break the rule is to add the dependency back rather tha
 
 ## What is in here, after the 2026-08-28 lift
 
-Seven widget classes (`Editors`, `Pills`, `Fields`, `Modals`, `Values`, `Styles`, `Thumbnail`) and five
+Seven widget classes (`Editors`, `Pills`, `Fields`, `Modals`, `Values`, `Styles`, `Thumbnail`) and three
 more that are not widgets at all:
 
 | class | what it is | why it is here and not in a plugin |
 |---|---|---|
 | `Slots` | the value as it is **written**, for an expression nothing can decode | two methods since 2026-09-22; see *No plugin parses anything* below |
-| `AbstractStudioPlugin` | the contributions, each built once on first use | the build hooks **cannot be fields**: `ServiceLoader` constructs a plugin while a project is opening |
-| `AbstractPluginType` | a `PluginType` that holds its own `Class` and reads components back without a cast per line | `build(List<Object>)` is the one place a declaration trusts what it is handed; a helper makes a wrong index a clearer failure than a `ClassCastException` on an unrelated line |
-| `Types` (2026-09-28) | a type declared as one expression: `editable`, `enumType`, `record` (a record's canonical constructor), `call` (parts derived from the factory); the `method`/`constructor`/`constant`/`parts` lookups and the part readers | every plugin copied the lookups and a `Fixed`/`Shape` base; a record states its parts already. An editor goes in as `() -> X::editor` (`Types.Drawn`) so building the type list links no JavaFX — `SdkPluginHeadlessTest` caught the plain method reference |
 | `ManagedHandle` (2026-09-28) | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window | every plugin with a value wrote the same four steps by hand, once per value; it names no plugin's word — the type comes from the plugin's own `ManagedValue<T>` |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext` | a plugin author could not unit-test an editor without writing this first, so the predicate half went untested |
+
+**Declaring a plugin and its types left this module on 2026-09-28.** `AbstractStudioPlugin` (memoised
+`build…` hooks), `AbstractPluginType` (a class plus part readers) and `Types` (one expression per type, the
+`method`/`constructor`/`constant` lookups by name, the part readers) were the toolkit's way to declare, and a
+plugin had to know them to write the obvious thing. The contract's steps replace all three —
+`StudioPlugin.id(…)` on `DeclaredPlugin`, `PluginType.value(…)`, `ComponentType.part(…)`, factories as method
+references — so a plugin declares with no toolkit at all, and names no method by string
+(`../botmaker-studio-api/CLAUDE.md`, *the declaration steps*). `Types` had lived five days.
 
 **`CallSites` and `Codecs` were here and are deleted (2026-09-22).** `CallSites` is
 `SlotEditor.forCall`/`forType` on the contract — 116 lines of `Predicate<ValueContext>` construction with no
