@@ -100,7 +100,8 @@ a plugin under rule 4 below, and a second plugin is who they are for).
 **1. A widget takes a `ValueContext` and gets everything else from it.** Not a `Stage` the caller found
 somewhere. `ctx.services()` is theming, dialogs and the project's paths, and it is the only door. A widget
 that needs something not on `StudioServices` is telling you the *contract* is missing something — say so, do
-not route around it.
+not route around it. A window with no value behind it (a checklist row that sets a run property) takes the
+`StudioServices` itself: `Modals.form` and `Modals.gallery` have that overload (2026-09-29), never a `Stage`.
 
 **2. Nothing throws while building a node.** `ValueContext.value` answers **empty** for anything the host's
 grammar could not decode — a variable, a computed initializer, `target.center()` — and that is a normal

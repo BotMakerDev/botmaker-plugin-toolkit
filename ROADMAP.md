@@ -5,6 +5,12 @@ reasoning.
 
 ## Done
 
+### 2026-09-29 — `Modals` without a value (rework follow-ups, phase 5)
+
+- `form(StudioServices, …)` and `gallery(StudioServices, …)`; the `ValueContext` forms delegate to them, and
+  `show` takes the services. The first caller is the SDK's Project Setup launch row (*Choose…*), which sets a
+  run property and has no slot. Rule 1 in `CLAUDE.md` says when this form is the right one.
+
 ### 2026-09-28 — declaring left for the contract (guided plugin declaration, phase 1)
 
 - `Types`, `AbstractStudioPlugin`, `AbstractPluginType` and `TypesTest` deleted; the contract's steps and `Ref`

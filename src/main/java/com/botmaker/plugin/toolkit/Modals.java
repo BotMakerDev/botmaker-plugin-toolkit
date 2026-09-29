@@ -67,6 +67,14 @@ public final class Modals {
      * answer — can close it.
      */
     public static Stage form(ValueContext ctx, String title, Parent body, Runnable onCommit) {
+        return form(ctx == null ? null : ctx.services(), title, body, onCommit);
+    }
+
+    /**
+     * {@link #form(ValueContext, String, Parent, Runnable)} for a window with no value behind it — a checklist
+     * row or a toolbar feature that sets something of its own. The window is themed and owned the same way.
+     */
+    public static Stage form(StudioServices services, String title, Parent body, Runnable onCommit) {
         Stage stage = new Stage();
         Runnable commit = onCommit == null ? null : () -> {
             stage.close();
@@ -74,7 +82,7 @@ public final class Modals {
         };
         VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), body,
                 buttons(commit, stage::close)), Styles.DIALOG_COMPACT);
-        show(ctx, stage, title, root);
+        show(services, stage, title, root);
         return stage;
     }
 
@@ -145,7 +153,7 @@ public final class Modals {
         };
         VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), body, hint,
                 buttons(commit, stage::close)), Styles.DIALOG_COMPACT);
-        show(ctx, stage, title, root);
+        show(ctx == null ? null : ctx.services(), stage, title, root);
     }
 
     /**
@@ -247,6 +255,15 @@ public final class Modals {
      */
     public static void gallery(ValueContext ctx, Gallery spec, Supplier<List<Thumbnail>> items,
                                Consumer<Thumbnail> onChosen) {
+        gallery(ctx == null ? null : ctx.services(), spec, items, onChosen);
+    }
+
+    /**
+     * {@link #gallery(ValueContext, Gallery, Supplier, Consumer)} for a choice with no value behind it — a
+     * checklist row that sets something of its own. The window is themed and owned the same way.
+     */
+    public static void gallery(StudioServices services, Gallery spec, Supplier<List<Thumbnail>> items,
+                               Consumer<Thumbnail> onChosen) {
         double wrap = 4 * (spec.coverWidth() + 12) + 12;
 
         FlowPane grid = new FlowPane(12, 12);
@@ -266,7 +283,7 @@ public final class Modals {
         VBox body = new VBox(8, search, scroll);
         body.setPrefWidth(wrap + 36);
 
-        Stage stage = form(ctx, spec.title(), body, null);
+        Stage stage = form(services, spec.title(), body, null);
         Consumer<Thumbnail> pick = chosen -> {
             stage.close();
             if (onChosen != null) onChosen.accept(chosen);
@@ -417,8 +434,7 @@ public final class Modals {
     }
 
     /** Themed, owned by the editor's window, modal to it, and shown without blocking the caller. */
-    private static void show(ValueContext ctx, Stage stage, String title, Parent root) {
-        StudioServices services = ctx == null ? null : ctx.services();
+    private static void show(StudioServices services, Stage stage, String title, Parent root) {
         stage.setTitle(title);
         stage.setScene(services == null ? new javafx.scene.Scene(root) : services.theme().scene(root));
         if (services != null) {

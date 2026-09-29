@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **`Modals.form` and `Modals.gallery` take a `StudioServices`** as well as a `ValueContext`, for a window
+  with no value behind it (a checklist row that sets something of its own). Themed and owned the same way.
+
 ### Removed
 
 - **Members no plugin called** (audit, 2026-09-28): `Editors.bounded`, `Editors.choice` (use `choiceSlot`),
