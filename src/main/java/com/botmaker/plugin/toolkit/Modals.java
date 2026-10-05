@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * The two windows an editor opens, themed and owned correctly without the plugin knowing how either is done.
+ * The windows a plugin opens, themed and owned correctly without the plugin knowing how either is done.
  *
  * <p>A plugin <b>must not</b> build its own {@link Stage} and show it. Two things go wrong when it does, and
  * neither is visible to the author who did it: the window gets none of the host's stylesheet, so it is a
@@ -83,6 +83,64 @@ public final class Modals {
         VBox root = Styles.on(new VBox(10, Styles.on(new Label(title), Styles.DIALOG_HEADING), body,
                 buttons(commit, stage::close)), Styles.DIALOG_COMPACT);
         show(services, stage, title, root);
+        return stage;
+    }
+
+    /**
+     * What a {@link #window} is, apart from its body: its title, the size it first opens at, the smallest it
+     * may be dragged down to ({@code 0} leaves that to the content), and what it blocks while open.
+     *
+     * @param modality {@link Modality#APPLICATION_MODAL} for a window that must be answered before anything
+     *                 else is touched, {@link Modality#NONE} for one that sits beside the editor
+     */
+    public record Frame(String title, double width, double height, double minWidth, double minHeight,
+                        Modality modality) {
+
+        /** A window that blocks the application until it closes. */
+        public static Frame modal(String title, double width, double height, double minWidth, double minHeight) {
+            return new Frame(title, width, height, minWidth, minHeight, Modality.APPLICATION_MODAL);
+        }
+
+        /** A window that stays open beside the editor. */
+        public static Frame modeless(String title, double width, double height, double minWidth,
+                                     double minHeight) {
+            return new Frame(title, width, height, minWidth, minHeight, Modality.NONE);
+        }
+    }
+
+    /**
+     * A plugin's own whole window — a manager, a canvas, a checklist — themed, owned by the editor, and opening
+     * at the size the user last left a window of this title at in this session.
+     *
+     * <p>{@link #form} is for a body with one answer; this is for a body with its own buttons, which is why
+     * there is no OK here. The {@link Stage} comes back <b>not yet shown</b>: the caller adds its close
+     * handlers and chooses {@code show()} or {@code showAndWait()}.
+     */
+    public static Stage window(StudioServices services, Frame frame, Parent body) {
+        return window(services, owner(services), frame, body);
+    }
+
+    /**
+     * {@link #window(StudioServices, Frame, Parent)} owned by another of the plugin's windows rather than the
+     * editor — a picker opened from a manager belongs to the manager, so it stays above it and closes with it.
+     */
+    public static Stage window(StudioServices services, javafx.stage.Window owner, Frame frame, Parent body) {
+        Stage stage = new Stage();
+        stage.setTitle(frame.title());
+        if (owner != null) stage.initOwner(owner);
+        stage.initModality(frame.modality());
+        double[] size = WindowSizes.opening(frame.title(), frame.width(), frame.height());
+        stage.setScene(services == null ? new javafx.scene.Scene(body, size[0], size[1])
+                : services.theme().scene(body, size[0], size[1]));
+        if (frame.minWidth() > 0) stage.setMinWidth(frame.minWidth());
+        if (frame.minHeight() > 0) stage.setMinHeight(frame.minHeight());
+        // A handler, not setOnHidden: the caller keeps that for its own cleanup. A maximized window is not a size
+        // the user chose — reopened unmaximized at it, its title bar would sit off the screen.
+        stage.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, e -> {
+            if (!stage.isMaximized() && !stage.isFullScreen()) {
+                WindowSizes.remember(frame.title(), stage.getScene().getWidth(), stage.getScene().getHeight());
+            }
+        });
         return stage;
     }
 

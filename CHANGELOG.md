@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`Modals.window(services, [owner,] frame, body)`**: a plugin's whole window — a manager, a canvas, a
+  checklist — themed and owned, returned unshown so the caller picks `show()` or `showAndWait()`.
+  `Modals.Frame` says its title, opening size, minimum size and modality; it reopens at the size it last
+  closed at in the session.
 - **`Styles.pick(node, chosen, among…)`**: one class of a set at a time, for a status line that turns from
   `WARNING_TEXT` to `OK_TEXT` — adding without removing leaves both, and the stylesheet decides.
 - **`ManagedSet<E>`**: one `@Managed` open set changed from a plugin's window — `members`, `read`, `add`,
