@@ -5,6 +5,89 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.3.0; re-released for updated upstream pins.
+
+### Added
+
+- **`Async.load(name, work, onDone[, onFailure])` and `Async.run(name, work, then)`**: slow work on a daemon
+  thread, its answer back on the JavaFX thread; a throw reaches `onFailure` as one sentence instead of leaving
+  a window on "Loading…". `Modals.gallery` now shows that sentence when its scan fails.
+- **`Modals.window(services, [owner,] frame, body)`**: a plugin's whole window — a manager, a canvas, a
+  checklist — themed and owned, returned unshown so the caller picks `show()` or `showAndWait()`.
+  `Modals.Frame` says its title, opening size, minimum size and modality; it reopens at the size it last
+  closed at in the session.
+- **`Styles.pick(node, chosen, among…)`**: one class of a set at a time, for a status line that turns from
+  `WARNING_TEXT` to `OK_TEXT` — adding without removing leaves both, and the stylesheet decides.
+- **`ManagedSet<E>`**: one `@Managed` open set changed from a plugin's window — `members`, `read`, `add`,
+  `uses`, `rename`, `repoint`, `remove` — addressed by the plugin's own `ManagedValue<E>`, so no set id is
+  spelled and `add` takes an `E`. It links only contract members v0.3.1 already has.
+
+No source changes since v0.2.0; re-released for updated upstream pins.
+
+### Added
+
+- **`Modals.form` and `Modals.gallery` take a `StudioServices`** as well as a `ValueContext`, for a window
+  with no value behind it (a checklist row that sets something of its own). Themed and owned the same way.
+
+### Removed
+
+- **Members no plugin called** (audit, 2026-09-28): `Editors.bounded`, `Editors.choice` (use `choiceSlot`),
+  `Fields.duration`, `Modals.numbers` (replaced by the tuple dialog), `Modals.chooser` (use `gallery`),
+  `Modals.Gallery.pictures`, both `Pills.menu` overloads (use `bare` + `onOpen`), `Region.right`/`bottom`/
+  `isEmpty`, and `ScreenPicks.color` (an implementation drops its override).
+- **No longer public**: `Fields.integer`, `Fields.bounded`, `Modals.tuple`, `Modals.program`, `Thumbnail.of`,
+  `ZoomPan.MIN_ZOOM`/`MAX_ZOOM` — each is part of a widget here and had no caller outside it.
+
+- **`Types`, `AbstractStudioPlugin` and `AbstractPluginType`.** Declaring a plugin and its types is the
+  contract's now, by steps and method references: `StudioPlugin.id(…)` on `DeclaredPlugin` instead of the
+  `build…` hooks, `PluginType.value(…)`/`ComponentType.part(…)` instead of `Types.editable`/`enumType`/`call`/
+  `record` and the `method`/`constructor`/`constant` string lookups, `Drawn` instead of `Types.Drawn`.
+
+### Added
+
+- **`Fields.stepped(field, step)`**: ▲/▼ beside a text field, the arrow keys and the wheel over it, Shift
+  held reported — what a step means is the caller's. The tuple dialog uses it, and its ▲/▼ now honour Shift.
+- **`Slots.sourceOr(ctx, prompt)`**: the expression as written, or `prompt` for an empty slot — the second
+  half of every pill label.
+
+- **`Types`**: a type declared as one expression instead of one class. `Types.editable(type, fresh, editor)`
+  (with `.preview`, `.freshCall`, `.writtenAs(call)`), `Types.enumType(type, editor)` (fresh = the first
+  constant), `Types.record(Class)` (a record's canonical constructor: parts, components and build all derived,
+  so `build(components(v))` equals `v` by construction) and `Types.call(type, factory, components, build)`
+  (parts derived from the factory, a varargs tail as its element type; `.constants(Field...)`). The lookups
+  `method`, `constructor`, `constant` and `parts`, and the part readers `whole`, `count`, `number`, `text`,
+  `flag`, `part`, `each`, are public here — every plugin had its own copy. An editor is passed as
+  `() -> MyEditors::point` (`Types.Drawn`): the outer lambda links no JavaFX, so a headless host can still
+  build the type list.
+- **`Modals.owner(services)`**: the window a plugin's own window belongs to, or `null` — the SDK spelled
+  `services.dialogs().ownerWindow().orElse(null)` seventeen times.
+- **`AbstractStudioPlugin.buildComponentTypes()` and `buildManagedValues()`**, memoised like the other hooks.
+
+- **`ManagedHandle<T>`**: one `@Managed` value, read and written from a plugin's window with no id spelled
+  and no cast — `open`, `openOrCreate` (asks the host for the holder first), `read` (a `T`), `readable`,
+  `write` (creates when missing; answers the sentence to show, or null). Every step is total.
+
+- **`ScreenPicks.choices()`** — where a pick can be made, each a picker bound to it; a tuple pill lists them
+  in its own menu (*Edit values…*, a separator, then the surfaces) instead of a "Pick on screen…" entry that
+  opened a second menu. Empty by default.
+- **`Modals.tuple`** — the reworked *Edit values…* dialog: a ▲/▼ stepper per number (arrows and the wheel,
+  Shift for 10), a to-scale drawing (a point on a grid, a size box, a rectangle in its frame), a rectangle's
+  right and bottom, and pasting `x, y` or `x, y, w, h` into any field fills them all. `Editors.Pick.heading()`.
+- **`Styles.SWITCH`** — an on/off toggle whose state shows in its colour (the host draws off red, on green).
+- **`TestContexts.Recording.withBounds`** — what `ValueContext.bounds()` answers; the stub does not clamp, so
+  a test catches an editor that ignores the range.
+
+### Changed
+
+- **`Styles` implements the contract's `StyleClasses`** and declares no name of its own; every constant is
+  still reachable as `Styles.X`.
+- **`AbstractPluginType`'s part readers delegate to `Types`.**
+
+- **`AbstractPluginType` does not implement `EditableType`** (contract 0.3.0), and its example says so: a
+  subclass that draws its type adds `implements EditableType<T>`.
+
 ## [0.3.0] — 2026-10-05
 
 ### Added
