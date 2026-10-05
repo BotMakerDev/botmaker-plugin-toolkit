@@ -53,6 +53,7 @@ possible source?* before anyone proposes Studio take this module.
 | `Pills` | the pill: `bare` + `onOpen` (a menu rebuilt on each open), `button`, `icon`, `item`, `separator`, `value` (placeholder styling when unset) |
 | `Fields` | `committing` (a text field that commits on Enter *and* on focus loss) and `stepped` (▲/▼, the arrow keys and the wheel over a field, Shift reported; what a step means is the caller's) |
 | `Modals` | a themed, owned window: `form` (any body, OK/Cancel, or Close for a body that has written already), `window` (a whole window with its own buttons, returned unshown — `Frame` says title, size, minimum and modality; reopens at the size it last closed at, in memory, `WindowSizes`), `gallery` (a searchable grid scanned off the FX thread, with an optional typed row — `Gallery`, `Thumbnail`), `owner` |
+| `Async` | slow work off the FX thread: `load` (a supplier's answer to a callback on the FX thread, a throw as one sentence to another) and `run` (work, then an optional FX follow-up); daemon threads, returned started so a closing window can interrupt them |
 | `Values` | reading a JDK value off a `ValueContext` with a fallback, `setNumber` (writes as the declared type), `labelOr`. Degrades, never throws |
 | `Slots` | the value as **written**, for an expression nothing can decode: `raw`, `isEmpty`, `sourceOr` (the second half of every pill label) |
 | `Styles` | the contract's `StyleClasses`, applied (`on`), plus `UNTHEMED`, an opt-out for a translucent surface over a live game |

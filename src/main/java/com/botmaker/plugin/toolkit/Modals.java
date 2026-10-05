@@ -363,25 +363,22 @@ public final class Modals {
             body.getChildren().add(row);
         }
 
-        Thread scan = new Thread(() -> {
+        Async.load("toolkit-gallery-scan", () -> {
             List<Thumbnail> found = items == null ? List.of() : items.get();
-            List<Thumbnail> safe = found == null ? List.<Thumbnail>of() : found;
-            javafx.application.Platform.runLater(() -> {
-                if (safe.isEmpty()) {
-                    status.setText(Values.labelOr(spec.emptyMessage(), "Nothing to choose from yet."));
-                    return;
-                }
-                for (Thumbnail item : safe) {
-                    Node node = cover(item, spec, () -> pick.accept(item));
-                    loaded.add(item);
-                    tiles.add(node);
-                    grid.getChildren().add(node);
-                }
-                scroll.setContent(grid);
-            });
-        }, "toolkit-gallery-scan");
-        scan.setDaemon(true);
-        scan.start();
+            return found == null ? List.<Thumbnail>of() : found;
+        }, safe -> {
+            if (safe.isEmpty()) {
+                status.setText(Values.labelOr(spec.emptyMessage(), "Nothing to choose from yet."));
+                return;
+            }
+            for (Thumbnail item : safe) {
+                Node node = cover(item, spec, () -> pick.accept(item));
+                loaded.add(item);
+                tiles.add(node);
+                grid.getChildren().add(node);
+            }
+            scroll.setContent(grid);
+        }, status::setText);
     }
 
     /** Hides what does not match rather than rebuilding the grid — the pictures are already decoded. */
@@ -459,18 +456,13 @@ public final class Modals {
     static void program(ValueContext ctx, Path initialDir, Consumer<Path> onChosen) {
         if (ctx == null || onChosen == null) return;
         Dialogs dialogs = ctx.services().dialogs();
-        Thread worker = new Thread(() -> {
-            Dialogs.Choice choice = dialogs.chooseProgram(initialDir);
-            javafx.application.Platform.runLater(() -> {
-                if (choice.nativeDialogShown()) {
-                    choice.path().ifPresent(onChosen);
-                } else {
-                    dialogs.chooseFile("Choose a program to launch", initialDir).path().ifPresent(onChosen);
-                }
-            });
-        }, "toolkit-program-chooser");
-        worker.setDaemon(true);
-        worker.start();
+        Async.load("toolkit-program-chooser", () -> dialogs.chooseProgram(initialDir), choice -> {
+            if (choice.nativeDialogShown()) {
+                choice.path().ifPresent(onChosen);
+            } else {
+                dialogs.chooseFile("Choose a program to launch", initialDir).path().ifPresent(onChosen);
+            }
+        });
     }
 
     /** <i>Cancel</i> on the left of <i>OK</i>, right-aligned; {@code onOk} null means there is no OK. */

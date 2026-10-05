@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`Async.load(name, work, onDone[, onFailure])` and `Async.run(name, work, then)`**: slow work on a daemon
+  thread, its answer back on the JavaFX thread; a throw reaches `onFailure` as one sentence instead of leaving
+  a window on "Loading…". `Modals.gallery` now shows that sentence when its scan fails.
 - **`Modals.window(services, [owner,] frame, body)`**: a plugin's whole window — a manager, a canvas, a
   checklist — themed and owned, returned unshown so the caller picks `show()` or `showAndWait()`.
   `Modals.Frame` says its title, opening size, minimum size and modality; it reopens at the size it last
