@@ -51,6 +51,7 @@ as a `ValueContext`.
 | `ScreenPicks`, `Region` | the screen pick a tuple pill asks its plugin for. |
 | `ZoomPan` | Ctrl+scroll zoom and middle-drag pan over a pane. |
 | `ManagedHandle` | one `@Managed` value, read and written from a plugin's own window. |
+| `ManagedSet` | one `@Managed` open set: its constants listed, read, added, renamed, repointed and removed. |
 | `testing.TestContexts` | a recording context, so an editor **and its predicate** can be unit-tested. |
 
 **No editor here writes Java into a bot.** An editor is handed the value and hands one back; the host

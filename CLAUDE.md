@@ -59,6 +59,7 @@ possible source?* before anyone proposes Studio take this module.
 | `ScreenPicks`, `Region` | the screen pick a tuple pill asks its plugin for: **the shape is the toolkit's and the pixels are the plugin's**. Passed to the widget, never registered in a static |
 | `ZoomPan` | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a pane and a content group — a gesture, which is the definition of a shape |
 | `ManagedHandle` | one `@Managed` value opened, read as its type, created when missing and written, from a plugin's own window; the type comes from the plugin's own `ManagedValue<T>` |
+| `ManagedSet` | one `@Managed` open set: `PluginValues`' member operations addressed by the plugin's own `ManagedValue<E>`, with `add` taking an `E`. Links only contract members a released contract has |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext`, so an editor **and its predicate** can be unit-tested. `withRun` enforces `minimum()` exactly as the host does, so a test can assert an editor honours the floor |
 
 **The split each time is *shape versus table*.** `tuplePill` is the SDK's three geometry editors written once;

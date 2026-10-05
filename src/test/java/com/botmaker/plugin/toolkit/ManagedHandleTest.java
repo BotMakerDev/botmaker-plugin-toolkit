@@ -89,6 +89,7 @@ class ManagedHandleTest {
     @Test
     void anOpenSetHasNoValueToHandle() {
         assertThrows(IllegalArgumentException.class,
-                () -> ManagedHandle.of(ManagedValue.openSet("pictures").in("Pictures").because("Mine.")));
+                () -> ManagedHandle.of(ManagedValue.openSet("pictures").of(String.class).in("Pictures")
+                        .because("Mine.")));
     }
 }

@@ -7,7 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.2.1; re-released for updated upstream pins.
+### Added
+
+- **`ManagedSet<E>`**: one `@Managed` open set changed from a plugin's window — `members`, `read`, `add`,
+  `uses`, `rename`, `repoint`, `remove` — addressed by the plugin's own `ManagedValue<E>`, so no set id is
+  spelled and `add` takes an `E`. It links only contract members v0.3.1 already has.
 
 No source changes since v0.2.0; re-released for updated upstream pins.
 
