@@ -28,4 +28,18 @@ public final class Styles implements StyleClasses {
         if (node != null && classes != null) node.getStyleClass().addAll(classes);
         return node;
     }
+
+    /**
+     * Gives {@code node} {@code chosen} and none of the rest of {@code among} — for a label whose state
+     * changes its look, such as one that turns from {@link #WARNING_TEXT} to {@link #OK_TEXT}. A null
+     * {@code chosen} clears them all. Adding without removing would leave both, and the stylesheet's later
+     * rule would win whatever the state.
+     */
+    public static <T extends Node> T pick(T node, String chosen, String... among) {
+        if (node == null) return null;
+        if (among != null) node.getStyleClass().removeAll(among);
+        node.getStyleClass().remove(chosen);
+        if (chosen != null) node.getStyleClass().add(chosen);
+        return node;
+    }
 }

@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`Styles.pick(node, chosen, among…)`**: one class of a set at a time, for a status line that turns from
+  `WARNING_TEXT` to `OK_TEXT` — adding without removing leaves both, and the stylesheet decides.
 - **`ManagedSet<E>`**: one `@Managed` open set changed from a plugin's window — `members`, `read`, `add`,
   `uses`, `rename`, `repoint`, `remove` — addressed by the plugin's own `ManagedValue<E>`, so no set id is
   spelled and `add` takes an `E`. It links only contract members v0.3.1 already has.
