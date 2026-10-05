@@ -12,7 +12,7 @@ as unstyled JavaFX, and that a text field which commits only on Enter silently l
 
 ```xml
 <dependency>
-    <groupId>com.github.LiQiyeDev</groupId>
+    <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-plugin-toolkit</artifactId>
     <version>v0.1.0</version>
 </dependency>
@@ -73,8 +73,8 @@ spells it.
 
 ```bash
 mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest, …
-mvn install     # com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
+mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
 ```
 
-Published through JitPack, which serves each git tag under `com.github.LiQiyeDev` regardless of this pom's
+Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
 `groupId`/`version`. Releases are cut from the umbrella with `../release.sh --plugin-toolkit <version>`.
