@@ -138,9 +138,9 @@ and these are bespoke single-value nodes); if a later need wants `PopOver` speci
 ## Why it flattens
 
 This module pins a BotMaker upstream — the contract, whose `ValueContext` every widget takes — so like
-`botmaker-session` and `botmaker-sdk` it runs `flatten-maven-plugin` and carries `.deps.env`: Maven publishes
-the *committed* pom, not the effective one, so without flatten a `-D` changes what this build resolves and
-nothing about what a plugin resolving this toolkit from JitPack sees. `flattenMode=oss` with
+`botmaker-session` and `botmaker-sdk` it runs `flatten-maven-plugin`: Maven publishes the *committed* pom, not
+the effective one, and flatten bakes the pin's value in rather than a `${…}` (until 2026-10-06 the value came
+from a `-D` that a `.deps.env` fed; now the release commit writes it, umbrella doc 43). `flattenMode=oss` with
 `<repositories>keep</repositories>`: `oss` strips the jitpack repository declaration otherwise, and a consumer
 resolving a `com.github.BotMakerDev` artifact needs it.
 
@@ -158,7 +158,7 @@ the author cannot find out any other way.
 mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest,
                 # TestContextsArgumentTest (29) — what is assertable with no JavaFX toolkit
 mvn dependency:tree   # nothing at `compile`: the property to keep
-mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
+mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit at the pom's main -SNAPSHOT
 ```
 
 Do not add a test that asserts a builder returned non-null; a compile proves that. What is worth holding is

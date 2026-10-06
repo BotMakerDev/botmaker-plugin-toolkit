@@ -32,9 +32,9 @@
       contract.
 
       Unlike botmaker-studio-api and botmaker-plugin-processor, this module DOES pin a BotMaker upstream, so
-      it carries the two things they refuse: a .deps.env (written by the umbrella release.sh, sourced by
-      jitpack.yml) and flatten-maven-plugin, which is what makes the -D-injected version reach the published
-      pom at all — Maven publishes the committed pom, not the effective one.
+      it carries flatten-maven-plugin, which bakes the pin's value into the published pom instead of a
+      ${…} — Maven publishes the committed pom, not the effective one. The value is the release commit's
+      (umbrella doc 43); a .deps.env and a -D fed it until 2026-10-06.
     -->
     <properties>
         <maven.compiler.release>25</maven.compiler.release>

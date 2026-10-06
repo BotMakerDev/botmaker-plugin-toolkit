@@ -73,7 +73,7 @@ spells it.
 
 ```bash
 mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest, …
-mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit:0.0.0-SNAPSHOT
+mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit at the pom's main -SNAPSHOT
 ```
 
 Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
