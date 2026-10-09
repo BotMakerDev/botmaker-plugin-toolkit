@@ -48,7 +48,7 @@ public final class TestContexts {
     private TestContexts() {}
 
     /**
-     * A value with a type and no call behind it — a Parameters row, or a {@code @Managed} method's value.
+     * A value with a type and no call behind it — a Parameters row, or a managed method's value.
      *
      * <p>{@link ValueContext#slot()} is empty here, which is the case every call-site predicate must decline
      * — and the one most easily forgotten, because it is the case that cannot arise while an editor is being

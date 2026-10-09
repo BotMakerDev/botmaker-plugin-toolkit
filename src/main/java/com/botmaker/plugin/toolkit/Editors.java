@@ -268,7 +268,7 @@ public final class Editors {
      * <p>The shape behind every coordinate editor. Taking the numbers off the screen is what it exists for —
      * nobody knows that a health bar is 240 pixels wide, they know where its ends are.
      *
-     * <p>One editor serves a slot in a bot's source, a row of the Parameters window and a {@code @Managed}
+     * <p>One editor serves a slot in a bot's source, a row of the Parameters window and a managed
      * value: the value crosses as a value and the host spells it, so there is nothing left for the editor to
      * know about where it is being shown.
      *
