@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -95,10 +96,16 @@ public final class ManagedHandle<T> {
     public String write(StudioServices services, T newValue) {
         Optional<ValueContext> ctx = openOrCreate(services);
         if (ctx.isEmpty()) {
-            return "This project has no " + value.id() + " value BotMaker can write"
+            return "This project has no " + spoken() + " value BotMaker can write"
                     + (value.holder() == null ? "." : " in " + value.holder() + ".java.");
         }
         ctx.get().set(newValue);
         return null;
+    }
+
+    /** The id's constant as a sentence says it: {@code …SdkValue$Id.FLOW_LAYOUT} is {@code "flow layout"}. */
+    private String spoken() {
+        String id = value.id();
+        return id.substring(id.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 }

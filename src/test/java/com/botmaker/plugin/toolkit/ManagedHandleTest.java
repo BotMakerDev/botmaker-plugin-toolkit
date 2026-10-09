@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManagedHandleTest {
 
     private static final ManagedValue<String> GREETING =
-            ManagedValue.method("greeting").in("Values").holds(String.class, "hello").because("Mine.");
+            ManagedValue.method(TestValue.Id.GREETING).in("Values").holds(String.class, "hello").because("Mine.");
 
-    /** A project holding one {@code @Managed("greeting")} String, created only when asked. */
+    /** A project holding one {@code @TestValue(GREETING)} String, created only when asked. */
     private static final class Project implements StudioServices, PluginValues {
         Object held;
         boolean exists;
@@ -34,10 +34,10 @@ class ManagedHandleTest {
         @Override public Dialogs dialogs() { return null; }
         @Override public PluginValues pluginValues() { return this; }
 
-        @Override public List<String> ids() { return exists ? List.of("greeting") : List.of(); }
+        @Override public List<String> ids() { return exists ? List.of(GREETING.id()) : List.of(); }
 
         @Override public Optional<ValueContext> open(String id) {
-            if (!exists || !"greeting".equals(id)) return Optional.empty();
+            if (!exists || !GREETING.id().equals(id)) return Optional.empty();
             return Optional.of(new ValueContext() {
                 @Override public TypeRef type() { return TypeRef.of(String.class); }
                 @Override public <T> Optional<T> value(Class<T> type) {
@@ -89,7 +89,7 @@ class ManagedHandleTest {
     @Test
     void anOpenSetHasNoValueToHandle() {
         assertThrows(IllegalArgumentException.class,
-                () -> ManagedHandle.of(ManagedValue.openSet("pictures").of(String.class).in("Pictures")
+                () -> ManagedHandle.of(ManagedValue.openSet(TestValue.Id.PICTURES).of(String.class).in("Pictures")
                         .because("Mine.")));
     }
 }

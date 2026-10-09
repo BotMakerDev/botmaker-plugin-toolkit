@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- `ManagedHandle.write`'s refusal names the value by its constant (`"flow layout"` for `…$Id.FLOW_LAYOUT`),
+  now that every managed id is a typed one.
+
 ### Fixed
 
 - v0.4.0 cannot be resolved: its pom pins the contract as `0.5.0`, which JitPack builds separately from tag

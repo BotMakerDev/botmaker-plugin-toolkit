@@ -20,9 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManagedSetTest {
 
     private static final ManagedValue<String> WORDS =
-            ManagedValue.openSet("words").of(String.class).in("Words").because("Mine.");
+            ManagedValue.openSet(TestValue.Id.WORDS).of(String.class).in("Words").because("Mine.");
 
-    /** A project holding the open set {@code @Managed("words")}, each constant a String; records every call. */
+    /** A project holding the open set {@code @TestValue(WORDS)}, each constant a String; records every call. */
     private static final class Project implements PluginValues {
         final Map<String, Object> members = new LinkedHashMap<>();
         final List<String> calls = new ArrayList<>();
@@ -31,7 +31,7 @@ class ManagedSetTest {
         @Override public Optional<ValueContext> open(String id) { return Optional.empty(); }
 
         @Override public List<String> members(String id) {
-            return "words".equals(id) ? List.copyOf(members.keySet()) : List.of();
+            return WORDS.id().equals(id) ? List.copyOf(members.keySet()) : List.of();
         }
 
         @Override public Optional<ValueContext> open(String id, String member) {
@@ -78,7 +78,9 @@ class ManagedSetTest {
         assertTrue(words.contains(project, "HI"));
         assertEquals(Optional.empty(), words.remove(project, "HI"));
 
-        assertEquals(List.of("add words.HELLO", "rename words.HELLO HI", "remove words.HI"), project.calls);
+        String id = WORDS.id();
+        assertEquals(List.of("add " + id + ".HELLO", "rename " + id + ".HELLO HI", "remove " + id + ".HI"),
+                project.calls);
         assertTrue(words.members(project).isEmpty());
     }
 
@@ -102,6 +104,6 @@ class ManagedSetTest {
     @Test
     void aMethodsValueIsNoSet() {
         assertThrows(IllegalArgumentException.class, () -> ManagedSet.of(
-                ManagedValue.method("greeting").in("Values").holds(String.class, "hi").because("Mine.")));
+                ManagedValue.method(TestValue.Id.GREETING).in("Values").holds(String.class, "hi").because("Mine.")));
     }
 }
