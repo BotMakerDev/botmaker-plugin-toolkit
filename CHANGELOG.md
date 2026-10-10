@@ -5,6 +5,16 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.6.0; re-released for updated upstream pins.
+
+### Fixed
+
+- **0.5.0 republished.** The toolkit is 0.5.0's, unchanged, on contract 0.6.1. Tag `v0.5.0` pinned contract
+  `v0.6.0`, which JitPack never built, so JitPack could not resolve it and serves nothing for 0.5.0. Depend on
+  0.5.1, never 0.5.0.
+
 ## [0.6.0] — 2026-10-10
 
 ### Fixed
