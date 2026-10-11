@@ -14,7 +14,7 @@ as unstyled JavaFX, and that a text field which commits only on Enter silently l
 <dependency>
     <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-plugin-toolkit</artifactId>
-    <version>v0.1.0</version>
+    <version><!-- latest tag: https://github.com/BotMakerDev/botmaker-plugin-toolkit/tags --></version>
 </dependency>
 ```
 
@@ -41,10 +41,11 @@ as a `ValueContext`.
 | | |
 |---|---|
 | `Editors` | whole editors — `tuplePill`, `boundedPill`, `flag`, `text`, `program`, `choiceSlot`. Take a `ValueContext`, need nothing else. |
-| `Pills` | the pill (`bare` + `onOpen`, `button`, `icon`) nine of the host's own thirteen pickers were. |
-| `Fields` | a text field that commits on Enter *and* on blur; `stepped`, ▲/▼ and the arrow keys and wheel over a field. |
-| `Modals` | a themed, correctly-owned window: `form` (any body, OK/Cancel), `gallery` (a searchable picture grid scanned off the FX thread), `owner`. |
-| `Values` | reading a JDK value off a `ValueContext` with a fallback, and `labelOr`. Degrades, never throws. |
+| `Pills` | the pill: `bare` + `onOpen` (a menu rebuilt on each open), `button`, `icon`, `item`, `separator`, `value`. |
+| `Fields` | `committing`, a text field that commits on Enter *and* on blur; `stepped`, ▲/▼ and the arrow keys and wheel over a field. |
+| `Modals` | a themed, correctly-owned window: `form` (any body, OK/Cancel), `gallery` (a searchable picture grid scanned off the FX thread), `window` (a whole window with its own buttons, reopened at the size it last closed at), `owner`. |
+| `Async` | slow work off the JavaFX thread, its answer back on it: `load`, `run`. |
+| `Values` | reading a JDK value off a `ValueContext` with a fallback, `setNumber` and `labelOr`. Degrades, never throws. |
 | `Styles` | the contract's style-class names, applied. |
 | `Thumbnail` | one cell of a gallery. |
 | `Slots` | the source of a value nothing can decode: `raw`, `isEmpty`, `sourceOr`. |
@@ -57,24 +58,21 @@ as a `ValueContext`.
 **No editor here writes Java into a bot.** An editor is handed the value and hands one back; the host
 spells it.
 
-`CallSites` and `Codecs` went on 2026-09-22, `Source` on 2026-09-23, and every member no plugin called on
-2026-09-28 (`CLAUDE.md`, *the audit*).
-
 ## What is deliberately not in it
 
 - **No UI dependency.** ControlsFX was weighed and declined — `PropertySheet` is a whole-form abstraction
   and these are bespoke single-value nodes.
-- **No resolved dependency at all** since 2026-09-22. JavaPoet was the one, and went when nothing here
-  spelled a value any more.
+- **No resolved dependency at all.** Nothing here spells a value, so nothing needs a code generator.
 - **No form or validation layer.** These were extracted from the host's own pickers because they recurred;
   the next one is worth adding the day a second editor wants it, not before.
 
 ## Building
 
 ```bash
-mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest, …
+mvn test        # the rules behind each widget, tested without a screen
 mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit at the pom's main -SNAPSHOT
 ```
 
-Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
-`groupId`/`version`. Releases are cut from the umbrella with `../release.sh --plugin-toolkit <version>`.
+Published through JitPack, which serves each git tag under `com.github.BotMakerDev`. Releases are cut from
+the umbrella only, with `--plugin-toolkit <version>` plus the downstreams it forces (basics, sdk, studio);
+`/release-check` names them.
