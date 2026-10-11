@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- `ManagedHandle.of` refuses a plugin's parameter (`ManagedValue.param`), as it refuses an open set: the
+  Parameters window and the Runner edit a parameter's value.
+
 No source changes since v0.6.1; re-released for updated upstream pins.
 
 No source changes since v0.6.0; re-released for updated upstream pins.

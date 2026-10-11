@@ -32,10 +32,14 @@ public final class ManagedHandle<T> {
         this.value = value;
     }
 
-    /** A handle on {@code value}, which must be a method-shaped value rather than an open set. */
+    /**
+     * A handle on {@code value}, which must be a method-shaped value rather than an open set or a parameter,
+     * whose value the Parameters window and the Runner edit.
+     */
     public static <T> ManagedHandle<T> of(ManagedValue<T> value) {
-        if (value == null || value.isOpenSet()) {
-            throw new IllegalArgumentException("a handle reads one method's value; an open set has none");
+        if (value == null || value.shape() != ManagedValue.Shape.METHOD) {
+            throw new IllegalArgumentException("a handle reads one method's value; an open set or a parameter"
+                    + " has none");
         }
         return new ManagedHandle<>(value);
     }
