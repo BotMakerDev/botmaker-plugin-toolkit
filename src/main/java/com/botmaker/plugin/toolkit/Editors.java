@@ -1,12 +1,14 @@
 package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.value.ComponentType;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
@@ -17,6 +19,7 @@ import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -125,6 +128,81 @@ public final class Editors {
             if (typed != null && !typed.isBlank()) box.setValue(typed.trim());
         });
         return box;
+    }
+
+    /**
+     * A pill over the constants of one of the plugin's open sets, written by reference: picking {@code DAILY}
+     * writes {@code Flows.DAILY}.
+     *
+     * <p>By reference and not by value, which is the reason this exists: two constants may hold equal values — a
+     * fresh one equals the set's empty value, a copy its source — and {@link ValueContext#set} would write the
+     * first constant equal to the pick. The pill shows {@link ManagedSet#picked}, the constant the bot names, and
+     * writes {@link ManagedSet#pick}. The constants are read when the menu opens, never when the pill is built, so
+     * one added in another window a moment ago is offered.
+     *
+     * <p>A value naming none of the set's constants — written by hand, or another set's — is shown as written and
+     * left alone until a pick. A pick the host refuses goes to the status line, and the pill keeps what it said.
+     *
+     * @param prompt what the pill says when the value is empty — the place to name what the set holds
+     */
+    public static Node memberChoice(ValueContext ctx, ManagedSet<?> set, String prompt) {
+        return memberChoice(ctx, set, prompt, null, null);
+    }
+
+    /**
+     * {@link #memberChoice(ValueContext, ManagedSet, String)}, with one entry after the constants that writes
+     * {@code noneValue} itself: {@code "(no flow)"} writing the set's empty value. While the value equals
+     * {@code noneValue} and names no constant, the pill says {@code noneLabel}.
+     *
+     * @throws IllegalArgumentException for a {@code noneLabel} with no {@code noneValue} to write
+     */
+    public static <E> Node memberChoice(ValueContext ctx, ManagedSet<E> set, String prompt, String noneLabel,
+                                        E noneValue) {
+        if (noneLabel != null && noneValue == null) {
+            throw new IllegalArgumentException("a none entry writes a value; give the one \"" + noneLabel + "\" is");
+        }
+        MenuButton pill = Pills.bare(memberLabel(ctx, set, prompt, noneLabel, noneValue));
+        return Pills.onOpen(pill, () -> {
+            // A constant renamed or removed in another window since the pill was drawn: say what it names now.
+            pill.setText(memberLabel(ctx, set, prompt, noneLabel, noneValue));
+            List<MenuItem> items = new ArrayList<>();
+            for (PluginValues.Member member : set.members(pluginValues(ctx))) {
+                items.add(Pills.item(member.toString(), () -> written(ctx, pill, member.toString(),
+                        set.pick(ctx, member))));
+            }
+            if (noneLabel != null) {
+                if (!items.isEmpty()) items.add(Pills.separator());
+                items.add(Pills.item(noneLabel, () -> written(ctx, pill, noneLabel, ctx.write(noneValue))));
+            }
+            return items;
+        });
+    }
+
+    /**
+     * What a {@link #memberChoice} pill says: the constant the value names, else {@code noneLabel} for a value
+     * equal to {@code noneValue}, else the value as written or {@code prompt}.
+     */
+    static <E> String memberLabel(ValueContext ctx, ManagedSet<E> set, String prompt, String noneLabel,
+                                  E noneValue) {
+        Optional<PluginValues.Member> picked = set.picked(ctx);
+        if (picked.isPresent()) return picked.get().toString();
+        if (noneLabel != null && noneValue != null && set.read(ctx).filter(noneValue::equals).isPresent()) {
+            return noneLabel;
+        }
+        return Slots.sourceOr(ctx, prompt);
+    }
+
+    /** Relabels {@code pill} to {@code label} when the host wrote the pick, else shows why not. */
+    private static void written(ValueContext ctx, MenuButton pill, String label, Optional<String> refused) {
+        if (refused.isEmpty()) {
+            pill.setText(label);
+        } else if (ctx.services() != null) {
+            ctx.services().status(refused.get());
+        }
+    }
+
+    private static PluginValues pluginValues(ValueContext ctx) {
+        return ctx.services() == null ? null : ctx.services().pluginValues();
     }
 
     /**

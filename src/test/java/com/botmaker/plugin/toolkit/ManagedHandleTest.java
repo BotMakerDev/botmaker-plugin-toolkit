@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,8 +35,8 @@ class ManagedHandleTest {
 
         @Override public List<String> ids() { return exists ? List.of(GREETING.id()) : List.of(); }
 
-        @Override public Optional<ValueContext> open(String id) {
-            if (!exists || !GREETING.id().equals(id)) return Optional.empty();
+        @Override public Optional<ValueContext> open(ManagedValue<?> value) {
+            if (!exists || !GREETING.id().equals(value.id())) return Optional.empty();
             return Optional.of(new ValueContext() {
                 @Override public TypeRef type() { return TypeRef.of(String.class); }
                 @Override public <T> Optional<T> value(Class<T> type) {
@@ -49,7 +48,7 @@ class ManagedHandleTest {
             });
         }
 
-        @Override public Optional<String> create(String id) {
+        @Override public Optional<String> create(ManagedValue<?> value) {
             exists = true;
             held = "hello";
             return Optional.empty();
@@ -62,7 +61,7 @@ class ManagedHandleTest {
         ManagedHandle<String> handle = ManagedHandle.of(GREETING);
 
         assertTrue(handle.read(project).isEmpty(), "nothing to read before the holder exists");
-        assertNull(handle.write(project, "hi"));
+        assertEquals(Optional.empty(), handle.write(project, "hi"));
         assertEquals(Optional.of("hi"), handle.read(project));
     }
 
@@ -82,7 +81,7 @@ class ManagedHandleTest {
         ManagedHandle<String> handle = ManagedHandle.of(GREETING);
 
         assertTrue(handle.read((StudioServices) null).isEmpty());
-        assertEquals("This project has no greeting value BotMaker can write in Values.java.",
+        assertEquals(Optional.of("This project has no greeting value BotMaker can write in Values.java."),
                 handle.write(null, "hi"));
     }
 

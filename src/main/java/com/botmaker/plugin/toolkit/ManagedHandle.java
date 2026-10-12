@@ -14,7 +14,7 @@ import java.util.Optional;
  * static final ManagedHandle<Flow> FLOW = ManagedHandle.of(MyValues.FLOW);
  *
  * Flow now = FLOW.read(services).orElse(Flow.NONE);
- * String refused = FLOW.write(services, edited);   // null when written
+ * FLOW.write(services, edited).ifPresent(services::status);   // empty when written
  * }</pre>
  *
  * <p>Every plugin with a value wrote these four steps by hand — open the id, read it as its type, ask the host
@@ -52,7 +52,7 @@ public final class ManagedHandle<T> {
     /** The value's context in the open project, or empty when there is none to edit. */
     public Optional<ValueContext> open(StudioServices services) {
         try {
-            return services == null ? Optional.empty() : services.pluginValues().open(value.id());
+            return services == null ? Optional.empty() : services.pluginValues().open(value);
         } catch (RuntimeException unreadable) {
             return Optional.empty();
         }
@@ -66,7 +66,7 @@ public final class ManagedHandle<T> {
         Optional<ValueContext> found = open(services);
         if (found.isPresent() || services == null) return found;
         try {
-            services.pluginValues().create(value.id());
+            services.pluginValues().create(value);
         } catch (RuntimeException refused) {
             return Optional.empty();
         }
@@ -95,16 +95,16 @@ public final class ManagedHandle<T> {
     /**
      * Writes {@code newValue}, creating the holder when the project has none.
      *
-     * @return null when written, else the sentence to show
+     * @return empty when written, else the sentence to show: no holder BotMaker can write, or the host's own
+     *         refusal of the value ({@link ValueContext#write})
      */
-    public String write(StudioServices services, T newValue) {
+    public Optional<String> write(StudioServices services, T newValue) {
         Optional<ValueContext> ctx = openOrCreate(services);
         if (ctx.isEmpty()) {
-            return "This project has no " + spoken() + " value BotMaker can write"
-                    + (value.holder() == null ? "." : " in " + value.holder() + ".java.");
+            return Optional.of("This project has no " + spoken() + " value BotMaker can write"
+                    + (value.holder() == null ? "." : " in " + value.holder() + ".java."));
         }
-        ctx.get().set(newValue);
-        return null;
+        return ctx.get().write(newValue);
     }
 
     /** The id's constant as a sentence says it: {@code …SdkValue$Id.FLOW_LAYOUT} is {@code "flow layout"}. */

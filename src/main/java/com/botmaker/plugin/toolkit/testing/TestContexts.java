@@ -6,10 +6,11 @@ import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.value.Ref;
 
 import java.lang.reflect.Executable;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,7 +27,7 @@ import java.util.Optional;
  * enough friction that the predicate half generally went untested.
  *
  * <pre>{@code
- * var ctx = TestContexts.slot(TestContexts.method(Game.class, "launchSteam", String.class), 0, "\"440\"");
+ * var ctx = TestContexts.slot(TestContexts.voidCall(Game::launchSteam), 0, "\"440\"");
  * assertTrue(STEAM_APP_ID.matches(ctx));
  * assertFalse(STEAM_APP_ID.matches(TestContexts.row(String.class, "\"440\"")));
  * }</pre>
@@ -66,7 +67,7 @@ public final class TestContexts {
      * component type for an argument of a varargs tail.
      *
      * @param call          the method or constructor called, as the host resolved it; {@code null} for a
-     *                      call it could not resolve — see {@link #method}
+     *                      call it could not resolve — see {@link #call}
      * @param argIndex      which argument this slot is, counting from 0
      * @param currentSource the Java expression currently in the slot
      */
@@ -80,27 +81,54 @@ public final class TestContexts {
     }
 
     /**
-     * The public method {@code owner} declares as {@code name} — the one overload with {@code parameters}
-     * when they are given, and otherwise the only one; for {@link #slot}. Throws when there is none, or when
-     * the name is overloaded and no parameters say which.
+     * The method or constructor {@code ref} names, for {@link #slot}: {@code TestContexts.call(Duration::ofMillis)}.
+     * javac checks the name and picks the overload from the reference, so a rename breaks the test where it is
+     * written. A method returning nothing is {@link #voidCall}, which javac cannot tell apart from this. An
+     * overloaded name needs its overload said with a cast: {@code call((Ref.Of2<Long, TemporalUnit, Duration>)
+     * Duration::of)}.
      */
-    public static Method method(Class<?> owner, String name, Class<?>... parameters) {
-        if (parameters.length > 0) {
-            try {
-                return owner.getDeclaredMethod(name, parameters);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalArgumentException(owner.getName() + " declares no " + name, e);
-            }
-        }
-        List<Method> named = new ArrayList<>();
-        for (Method each : owner.getDeclaredMethods()) {
-            if (each.getName().equals(name) && Modifier.isPublic(each.getModifiers())) named.add(each);
-        }
-        if (named.size() != 1) {
-            throw new IllegalArgumentException(owner.getName() + " declares " + named.size() + " public "
-                    + name + " methods; name the parameters");
-        }
-        return named.getFirst();
+    public static <R> Executable call(Ref.Of0<R> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #call(Ref.Of0)} for one argument, or a receiver: {@code Duration::ofMillis}. */
+    public static <A, R> Executable call(Ref.Of1<A, R> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #call(Ref.Of0)} for two. */
+    public static <A, B, R> Executable call(Ref.Of2<A, B, R> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #call(Ref.Of0)} for three. */
+    public static <A, B, C, R> Executable call(Ref.Of3<A, B, C, R> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #call(Ref.Of0)} for four. */
+    public static <A, B, C, D, R> Executable call(Ref.Of4<A, B, C, D, R> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** The {@code void} method {@code ref} names, for {@link #slot}: {@code TestContexts.voidCall(Game::launchSteam)}. */
+    public static <A> Executable voidCall(Ref.Void1<A> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #voidCall(Ref.Void1)} for two arguments. */
+    public static <A, B> Executable voidCall(Ref.Void2<A, B> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #voidCall(Ref.Void1)} for three. */
+    public static <A, B, C> Executable voidCall(Ref.Void3<A, B, C> ref) {
+        return Ref.resolve(ref);
+    }
+
+    /** {@link #voidCall(Ref.Void1)} for four. */
+    public static <A, B, C, D> Executable voidCall(Ref.Void4<A, B, C, D> ref) {
+        return Ref.resolve(ref);
     }
 
     private static Class<?> parameterType(Executable call, int argIndex) {
@@ -135,6 +163,8 @@ public final class TestContexts {
         private List<Object> runAllowed;
         private List<Object> runReplacement;
         private final Map<Integer, Object> arguments = new HashMap<>();
+        /** The constant of each open set, by its id, that the value is written as. */
+        private final Map<String, PluginValues.Member> members = new HashMap<>();
         private Bounds bounds = Bounds.NONE;
 
         private Recording(Class<?> type, String source, boolean isSlot, Executable call, int argIndex) {
@@ -212,6 +242,17 @@ public final class TestContexts {
             return this;
         }
 
+        /**
+         * The constant of the open set {@code set} the value is written as — what {@link ValueContext#member}
+         * answers, {@code Flows.DAILY} for a slot holding that reference. Set, never derived, for the reason
+         * {@link #withValue} gives; a {@link ValueContext#writeMember} replaces it and counts a write.
+         */
+        public Recording withMember(ManagedValue<?> set, PluginValues.Member member) {
+            if (member == null) members.remove(set.id());
+            else members.put(set.id(), member);
+            return this;
+        }
+
         /** What {@link SlotRun#replace} was last given, or {@code null} if the editor never rewrote the run. */
         public List<Object> runReplacement() {
             return runReplacement;
@@ -255,6 +296,21 @@ public final class TestContexts {
         public void set(Object newValue) {
             this.value = newValue;
             writes++;
+        }
+
+        /** What {@link #withMember} seeded for {@code set}. */
+        @Override
+        public Optional<PluginValues.Member> member(ManagedValue<?> set) {
+            return set == null ? Optional.empty() : Optional.ofNullable(members.get(set.id()));
+        }
+
+        /** Records the constant as {@link #withMember} would, and counts a write. */
+        @Override
+        public Optional<String> writeMember(ManagedValue<?> set, PluginValues.Member member) {
+            if (set == null || member == null) return Optional.of("No constant to write.");
+            members.put(set.id(), member);
+            writes++;
+            return Optional.empty();
         }
 
         @Override
