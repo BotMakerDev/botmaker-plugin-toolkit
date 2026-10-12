@@ -5,6 +5,44 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.8.0; re-released for updated upstream pins.
+
+### Build
+
+- **JitPack builds with `.jitpack/build.sh`**, the umbrella's `tools/jitpack/build.sh`: Maven 3.9.9 and every
+  dependency from Google's mirror of Maven Central first, with backoff and Maven's 429 retry, so Central's
+  `429 Too Many Requests` no longer loses a tag. The statx shim comes with it.
+
+### Added
+
+- **`ManagedSet` covers the whole open set, addressed by `Member`.** `members` answers `PluginValues.Member`s,
+  and every constant is passed as one (`ITEMS.add(values, Member.of("FIRST"), item)`). New: the nested enums of a
+  grouped set (`groups`, `addGroup`, `renameGroup`, `removeGroup`, `methods`, `createMethod`), `byGroup(Class,
+  group)`, and a slot's constant — `picked(ctx)` reads which one the bot names, `pick(ctx, member)` writes it by
+  reference.
+- **`Editors.memberChoice(ctx, set, prompt)`**: a pill over an open set's constants that writes the pick by
+  reference, never the first constant equal to it. A variant adds one entry writing a value of its own, such as
+  `"(no flow)"`.
+- **`TestContexts.call(Duration::ofMillis)` / `voidCall(Game::launchSteam)`** name a slot's call by reference,
+  and `Recording.withMember(set, member)` seeds the constant a value names.
+
+### Changed
+
+- **`ManagedHandle.write` answers `Optional<String>`**, empty when written, and passes on the host's own refusal
+  of the value (`ValueContext.write`) instead of reporting success.
+- Built on contract 0.9.0, whose `PluginValues` takes a `ManagedValue` and a `Member`: a plugin using this toolkit
+  needs a host on contract 0.9.0.
+- **`Editors.memberChoice`** relabels its pill each time it opens, so a constant renamed in another window is
+  shown by its new name; a none entry with no value to write is refused where it is declared.
+
+### Removed
+
+- `ManagedSet`'s `String`-member operations (a constant is a `Member`), and `TestContexts.method(Class, String,
+  Class...)`: name the call by reference, `TestContexts.call(…)` / `voidCall(…)`, casting to the `Ref.Of…` an
+  overloaded name means.
+
 ## [0.8.0] — 2026-10-12
 
 ### Build
