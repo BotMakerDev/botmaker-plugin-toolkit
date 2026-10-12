@@ -99,6 +99,14 @@ public final class ManagedSet<E> {
         return host(values).remove(set.id(), member);
     }
 
+    /**
+     * Declares {@code member} just above {@code before} when it is written below it, so {@code before}'s
+     * initialiser may read it; see {@link PluginValues#moveBefore}. Empty when done or already so, else why not.
+     */
+    public Optional<String> moveBefore(PluginValues values, String member, String before) {
+        return host(values).moveBefore(set.id(), member, before);
+    }
+
     private static PluginValues host(PluginValues values) {
         return values == null ? PluginValues.NONE : values;
     }

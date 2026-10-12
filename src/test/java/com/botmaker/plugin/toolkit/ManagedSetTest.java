@@ -99,6 +99,7 @@ class ManagedSetTest {
         assertTrue(words.members(null).isEmpty());
         assertTrue(words.read(null, "HELLO").isEmpty());
         assertEquals(Optional.of(PluginValues.NO_SOURCE_TREE), words.add(null, "HELLO", "hello"));
+        assertEquals(Optional.of(PluginValues.NO_SOURCE_TREE), words.moveBefore(null, "HELLO", "HI"));
     }
 
     @Test

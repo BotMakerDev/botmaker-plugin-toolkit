@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `ManagedSet.moveBefore(values, member, before)` declares one constant above another, so the other's
+  initialiser may read it (`PluginValues.moveBefore`, contract 0.8.0).
+
 ### Changed
 
 - `ManagedHandle.of` refuses a plugin's parameter (`ManagedValue.param`), as it refuses an open set: the
