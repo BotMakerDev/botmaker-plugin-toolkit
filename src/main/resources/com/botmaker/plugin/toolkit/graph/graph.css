@@ -1,0 +1,85 @@
+/*
+ * GraphCanvas's look. Every colour resolves a -bm-* token the host's theme publishes on the scene root, so the
+ * canvas follows the editor into a dark theme without this file knowing what the themes are. The canvas's own
+ * tokens are derived here, once, from the general ones; a plugin's stylesheet may redefine any of them.
+ */
+
+.graph-canvas {
+    -bm-graph-background: -fx-control-inner-background;
+    -bm-graph-grid: -bm-divider;
+    -bm-graph-link: -bm-primary;
+    -bm-graph-link-dashed: -bm-muted;
+    -bm-graph-selected: -bm-primary;
+    -bm-graph-match: -bm-accent;
+    -bm-graph-minimap: derive(-fx-control-inner-background, -6%);
+}
+
+.graph-canvas-content {
+    -fx-background-color: -bm-graph-background;
+}
+
+/* Nothing is drawn with this rule: the grid is a pattern tile, which takes a colour, so the canvas reads it here. */
+.graph-grid-ink {
+    -fx-background-color: -bm-graph-grid;
+}
+
+.graph-scroller,
+.graph-scroller > .viewport {
+    -fx-background-color: -bm-graph-background;
+}
+
+.graph-link {
+    -fx-stroke: -bm-graph-link;
+    -fx-stroke-width: 1.6;
+    -fx-fill: transparent;
+}
+
+.graph-link-head {
+    -fx-fill: -bm-graph-link;
+    -fx-stroke: -bm-graph-link;
+}
+
+.graph-link.graph-link-dashed {
+    -fx-stroke: -bm-graph-link-dashed;
+    -fx-stroke-dash-array: 6 5;
+}
+
+.graph-link-head.graph-link-dashed {
+    -fx-fill: -bm-graph-link-dashed;
+    -fx-stroke: -bm-graph-link-dashed;
+}
+
+.graph-node {
+    -fx-cursor: hand;
+}
+
+.graph-node:match {
+    -fx-effect: dropshadow(gaussian, -bm-graph-match, 14, 0.45, 0, 0);
+}
+
+.graph-node:selected {
+    -fx-effect: dropshadow(gaussian, -bm-graph-selected, 16, 0.6, 0, 0);
+}
+
+.graph-minimap {
+    -fx-background-color: -bm-graph-minimap;
+    -fx-border-color: -bm-divider;
+    -fx-border-width: 1;
+    -fx-translate-x: -12;
+    -fx-translate-y: -12;
+    -fx-opacity: 0.92;
+}
+
+.graph-minimap-card {
+    -fx-fill: -bm-muted;
+}
+
+.graph-minimap-card:selected {
+    -fx-fill: -bm-graph-selected;
+}
+
+.graph-minimap-view {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-graph-selected;
+    -fx-stroke-width: 1.5;
+}

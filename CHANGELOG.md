@@ -7,7 +7,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.8.0; re-released for updated upstream pins.
+### Added
+
+- **A graph canvas, `graph.GraphCanvas<N, E>`, for any plugin that draws a graph.** The plugin draws each card
+  (`N -> Node`, measured by the canvas) and says how each edge runs (`Arrow`: from, port, to, solid or dashed, an
+  optional label node). The canvas places the cards and routes the links clear of every card. It offers:
+  - Ctrl+scroll zoom about the cursor, right- or middle-drag pan, and a dot grid;
+  - a minimap that moves the view, and `fit()`;
+  - selection (`selectedProperty`), double-click to open (`setOnOpen`), and hidable dashed links;
+  - search: `find(Predicate)`, or `searchField(text)`, where Enter steps to the next match;
+  - `savePng(file)`, the whole graph at 1:1. It writes the PNG itself: `javafx-swing` is not needed.
+
+  A card new since the last `show` fades in. Colours come from `-bm-*` tokens through its own `graph.css`, in
+  light and dark.
+- **Layouts with no dependency** (`graph.GraphLayout`, `LayeredLayout`, `TreeLayout`, `Routes`), with no JavaFX:
+  - `LayeredLayout` is the SDK flow editor's Sugiyama layout, made generic. It handles loops, keeps port order,
+    and with `sweeps = 0` keeps the order you list.
+  - `TreeLayout` is a tidy tree from one root. Parents are centred on their children, and subtrees collapse.
+  - `Routes` draws links clear of cards: S-curves forward, rounded detours back.
+  - Both layouts run right or down.
+
+  ELK was weighed and declined: the SDK brings this module into every bot, and ELK would have brought EMF and
+  Guava (8.4 MB) with it. This module still resolves nothing at `compile`.
+
+### Release
+
+- The SDK's screen map and flow editor build on the graph package, so the toolkit's release goes before the SDK's,
+  which it already forces.
 
 ### Build
 

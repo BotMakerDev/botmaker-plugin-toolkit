@@ -61,6 +61,8 @@ possible source?* before anyone proposes Studio take this module.
 | `ZoomPan` | Ctrl+scroll zoom about the cursor and middle-drag pan, as event **filters** over a pane and a content group — a gesture, which is the definition of a shape |
 | `ManagedHandle` | one managed value opened, read as its type, created when missing and written, from a plugin's own window; the type comes from the plugin's own `ManagedValue<T>` |
 | `ManagedSet` | one managed open set (a marked class, or an enum when declared `ofEnum`): every `PluginValues` operation on it — constants as `PluginValues.Member`, a grouped set's nested enums and their methods — addressed by the plugin's own `ManagedValue<E>`, with `add` taking an `E`; `picked`/`pick` read and write the constant a slot names, by reference. Needs contract 0.8.2; the `String`-member forms go in 0.9.0 |
+| `graph.GraphCanvas` | a graph to look at: the plugin draws each card and says how each edge runs (`Arrow`, solid or dashed, a label); the canvas measures, lays out, routes links clear of cards, and gives zoom, pan, grid, minimap, selection, search and `savePng` (its own `Png` encoder: no `javafx-swing`). Colours from `-bm-*` tokens via its `graph.css` |
+| `graph.LayeredLayout`, `graph.TreeLayout`, `graph.Routes`, `graph.GraphLayout` | the layouts, pure and JavaFX-free: layered (lifted from the SDK's flow editor: loops, ports, lanes), a tidy tree (collapsible), and link routes clear of cards; right or down. **Our own, not ELK** (2026-10-14): ELK, EMF and Guava would have reached every bot through the SDK |
 | `testing.TestContexts` | a recording `SlotContext`/`ValueContext`, so an editor **and its predicate** can be unit-tested. `withRun` enforces `minimum()` exactly as the host does, so a test can assert an editor honours the floor |
 
 **The split each time is *shape versus table*.** `tuplePill` is the SDK's three geometry editors written once;
@@ -156,7 +158,7 @@ the author cannot find out any other way.
 
 ```bash
 mvn test        # ValuesTest, SlotRunTest, TupleLabelTest, TupleFieldsTest, ManagedHandleTest,
-                # TestContextsArgumentTest (29) — what is assertable with no JavaFX toolkit
+                # TestContextsArgumentTest, the graph layouts' tests (68) — what is assertable with no JavaFX toolkit
 mvn dependency:tree   # nothing at `compile`: the property to keep
 mvn install     # com.github.BotMakerDev:botmaker-plugin-toolkit at the pom's main -SNAPSHOT
 ```
