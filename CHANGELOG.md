@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`GraphCanvas` links and menus**: `setOnEdgeClicked` (a click on a link or its label), `setMenus` (a right-click
+  menu per card and per link; a right-drag still pans), `zoomIn`/`zoomOut` about the middle, and
+  `viewportProperty()`. Cards are cached as bitmaps, so panning a large graph no longer lags.
+
 - **A graph canvas, `graph.GraphCanvas<N, E>`, for any plugin that draws a graph.** The plugin draws each card
   (`N -> Node`, measured by the canvas) and says how each edge runs (`Arrow`: from, port, to, solid or dashed, an
   optional label node). The canvas places the cards and routes the links clear of every card. It offers:

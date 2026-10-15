@@ -14,15 +14,18 @@ import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.SnapshotParameters;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.PixelFormat;
@@ -51,6 +54,7 @@ import javafx.util.Duration;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,9 +77,10 @@ import java.util.function.Predicate;
  *       ({@link #setOnOpen}).</li>
  *   <li><b>Links</b>: {@code arrow} says where each edge runs, whether it is dashed and what label rides on it. Only
  *       solid links shape the layout; dashed ones are drawn between the placed cards and can be hidden
- *       ({@link #setShowDashed}).</li>
- *   <li><b>Gestures</b>: Ctrl+scroll zooms about the cursor, a right- or middle-drag pans, the minimap moves the view;
- *       {@link #fit()} shows everything.</li>
+ *       ({@link #setShowDashed}). A link or its label is clicked ({@link #setOnEdgeClicked}).</li>
+ *   <li><b>Gestures</b>: Ctrl+scroll zooms about the cursor, {@link #zoomIn()} and {@link #zoomOut()} about the
+ *       middle, a right- or middle-drag pans, a right click that did not drag opens the card's or the link's menu
+ *       ({@link #setMenus}), the minimap moves the view; {@link #fit()} shows everything.</li>
  *   <li><b>Search</b>: {@link #find} marks the matching cards and brings the first into view;
  *       {@link #searchField} is a field wired to it.</li>
  *   <li><b>Export</b>: {@link #savePng} writes the whole graph at 1:1, whatever the zoom.</li>
@@ -130,6 +135,12 @@ public final class GraphCanvas<N, E> extends StackPane {
     private static final double MIN_ZOOM = 0.1;
     private static final double MAX_ZOOM = 2.5;
     private static final double ZOOM_STEP = 1.1;
+    /** What a press of {@link #zoomIn()} or {@link #zoomOut()} scales by. */
+    private static final double BUTTON_STEP = 1.25;
+    /** How far a right press may move and still be a click, opening a menu, rather than a pan. */
+    private static final double CLICK_SLOP = 4;
+    /** How wide a link takes a click: its own stroke is thinner than a pointer aims. */
+    private static final double HIT_WIDTH = 12;
     private static final double MINIMAP_MAX = 170;
     private static final double HEAD = 7;
 
@@ -140,6 +151,9 @@ public final class GraphCanvas<N, E> extends StackPane {
     private Function<N, Map<String, Double>> ports = n -> Map.of();
     private Direction direction = Direction.RIGHT;
     private Consumer<N> onOpen = n -> {};
+    private Consumer<E> onEdgeClicked = e -> {};
+    private Function<N, ContextMenu> nodeMenu = n -> null;
+    private Function<E, ContextMenu> edgeMenu = e -> null;
     private boolean showDashed = true;
 
     private final Pane content = new Pane();
@@ -170,7 +184,14 @@ public final class GraphCanvas<N, E> extends StackPane {
     private List<Card> cards = List.of();
     private Placement placement = new Placement(Map.of(), Set.of(), 0);
     private List<Arrow> arrows = List.of();
+    /** The edge each of {@link #arrows} draws, at the same index. */
+    private List<E> arrowEdges = List.of();
+    /** The edge each drawn link's hit line and label stands for: what a click on one names. */
+    private final Map<Node, E> edgeOf = new HashMap<>();
+    /** The menu shown last, closed when another opens. */
+    private ContextMenu shownMenu;
 
+    private boolean panMoved;
     private double panX;
     private double panY;
     private double panH;
@@ -197,7 +218,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         gridInk.setManaged(false);
         gridInk.setMouseTransparent(true);
         gridInk.resize(0, 0);
-        links.setMouseTransparent(true);
+        // Only each link's hit line takes the pointer (drawLinks); the strokes and heads let it through.
         content.getChildren().addAll(grid, gridInk, links, cells, labels);
 
         Group scaled = new Group(content);
@@ -263,6 +284,21 @@ public final class GraphCanvas<N, E> extends StackPane {
         this.onOpen = onOpen;
     }
 
+    /** Called with an edge when its link or its label is clicked. */
+    public void setOnEdgeClicked(Consumer<E> onEdgeClicked) {
+        this.onEdgeClicked = onEdgeClicked;
+    }
+
+    /**
+     * The menus a right click that did not drag opens: {@code nodes} for a card, which is selected first, and
+     * {@code edges} for a link or its label. Either answers null for no menu. A right press goes to the canvas,
+     * which pans on a drag, so a card's own right-click handler never sees it: this is how a card gets a menu.
+     */
+    public void setMenus(Function<N, ContextMenu> nodes, Function<E, ContextMenu> edges) {
+        this.nodeMenu = nodes;
+        this.edgeMenu = edges;
+    }
+
     /**
      * The selected item, or null. Setting it marks that card; {@link #centreOn} brings one into view. The math reads
      * the laid-out size ({@code prefWidth}), so it is right straight after {@link #show}, before the next pulse.
@@ -279,6 +315,14 @@ public final class GraphCanvas<N, E> extends StackPane {
 
     public ReadOnlyDoubleProperty zoomProperty() {
         return zoomLevel.getReadOnlyProperty();
+    }
+
+    /**
+     * The part of the canvas the graph is seen through, in its own pixels: what an {@link Arrange} that picks its
+     * shape by the window's proportions reads, and listens to for a resize.
+     */
+    public ReadOnlyObjectProperty<Bounds> viewportProperty() {
+        return scroller.viewportBoundsProperty();
     }
 
     // --- layout ---
@@ -309,8 +353,16 @@ public final class GraphCanvas<N, E> extends StackPane {
             measured.add(new Card(id.apply(node), width, height, portsOf(node)));
         }
         cards = measured;
-        arrows = edges.stream().map(arrow)
-                .filter(a -> a != null && byId.containsKey(a.from()) && byId.containsKey(a.to())).toList();
+        List<Arrow> kept = new ArrayList<>();
+        List<E> keptEdges = new ArrayList<>();
+        for (E edge : edges) {
+            Arrow a = arrow.apply(edge);
+            if (a == null || !byId.containsKey(a.from()) || !byId.containsKey(a.to())) continue;
+            kept.add(a);
+            keptEdges.add(edge);
+        }
+        arrows = List.copyOf(kept);
+        arrowEdges = List.copyOf(keptEdges);
         List<Link> solid = arrows.stream().filter(a -> !a.dashed()).map(a -> new Link(a.from(), a.port(), a.to()))
                 .toList();
         placement = arrange.place(cards, solid);
@@ -338,9 +390,15 @@ public final class GraphCanvas<N, E> extends StackPane {
         Set<String> shownIds = new HashSet<>(placement.at().keySet());
         shownIds.removeAll(placement.hidden());
         // Only links between two shown cards, so the routes come back one for one, in this order.
-        List<Arrow> drawn = arrows.stream()
-                .filter(a -> (showDashed || !a.dashed()) && shownIds.contains(a.from()) && shownIds.contains(a.to()))
-                .toList();
+        List<Arrow> drawn = new ArrayList<>();
+        List<E> drawnEdges = new ArrayList<>();
+        for (int i = 0; i < arrows.size(); i++) {
+            Arrow a = arrows.get(i);
+            if ((showDashed || !a.dashed()) && shownIds.contains(a.from()) && shownIds.contains(a.to())) {
+                drawn.add(a);
+                drawnEdges.add(arrowEdges.get(i));
+            }
+        }
         List<Link> drawnLinks = drawn.stream().map(a -> new Link(a.from(), a.port(), a.to())).toList();
         List<Route> routes = Routes.of(cards, placement.at(), drawnLinks, direction, Routes.Rules.DEFAULT);
 
@@ -365,7 +423,7 @@ public final class GraphCanvas<N, E> extends StackPane {
             placed.put(card.id(), new Box(at.x() + dx, at.y() + dy, at.x() + dx + card.width(),
                     at.y() + dy + card.height()));
         }
-        drawLinks(routes, drawn, dx, dy);
+        drawLinks(routes, drawn, drawnEdges, dx, dy);
         drawMinimap();
     }
 
@@ -373,6 +431,8 @@ public final class GraphCanvas<N, E> extends StackPane {
         StackPane cell = new StackPane(view.apply(node));
         cell.getStyleClass().add("graph-node");
         cell.setManaged(false);
+        // Drawn once and moved as a picture while the view pans: a card of pictures and effects is slow to draw.
+        cell.setCache(true);
         cell.setOnMouseClicked(e -> {
             if (e.getButton() != MouseButton.PRIMARY) return;
             selected.set(node);
@@ -389,31 +449,33 @@ public final class GraphCanvas<N, E> extends StackPane {
         fade.play();
     }
 
-    private void drawLinks(List<Route> routes, List<Arrow> drawn, double dx, double dy) {
+    private void drawLinks(List<Route> routes, List<Arrow> drawn, List<E> drawnEdges, double dx, double dy) {
         links.getChildren().clear();
         labels.getChildren().clear();
+        edgeOf.clear();
         // Routes come back in the order of the links they were asked for, skipping none: both cards are shown.
         for (int i = 0; i < routes.size() && i < drawn.size(); i++) {
             Route route = routes.get(i);
             Arrow a = drawn.get(i);
-            Path path = new Path();
+            E edge = drawnEdges.get(i);
+            Path path = route(route, dx, dy);
             path.getStyleClass().add("graph-link");
             if (a.dashed()) path.getStyleClass().add("graph-link-dashed");
-            Pt start = route.start();
-            path.getElements().add(new MoveTo(start.x() + dx, start.y() + dy));
-            for (Segment segment : route.segments()) {
-                Pt to = segment.to();
-                if (segment instanceof Cubic c) {
-                    path.getElements().add(new CubicCurveTo(c.c1().x() + dx, c.c1().y() + dy,
-                            c.c2().x() + dx, c.c2().y() + dy, to.x() + dx, to.y() + dy));
-                } else {
-                    path.getElements().add(new LineTo(to.x() + dx, to.y() + dy));
-                }
-            }
-            links.getChildren().addAll(path, head(route, a.dashed(), dx, dy));
+            path.setMouseTransparent(true);
+            Polygon head = head(route, a.dashed(), dx, dy);
+            head.setMouseTransparent(true);
+            // An unseen wider line along the link takes its clicks: the drawn stroke is a pixel or two.
+            Path hit = route(route, dx, dy);
+            hit.setFill(null);
+            hit.setStroke(Color.TRANSPARENT);
+            hit.setStrokeWidth(HIT_WIDTH);
+            hit.setCursor(Cursor.HAND);
+            clickable(hit, edge);
+            links.getChildren().addAll(hit, path, head);
             // A label node can have one parent: one shared by two edges rides on the first.
             if (a.label() != null && a.label().getParent() == null) {
                 Node label = a.label();
+                clickable(label, edge);
                 labels.getChildren().add(label);
                 label.applyCss();
                 if (label instanceof Region region) region.autosize();
@@ -422,6 +484,33 @@ public final class GraphCanvas<N, E> extends StackPane {
                 label.relocate(middle.x() + dx - b.getWidth() / 2, middle.y() + dy - b.getHeight() / 2);
             }
         }
+    }
+
+    /** {@code route} as a path, moved by {@code (dx, dy)}. */
+    private static Path route(Route route, double dx, double dy) {
+        Path path = new Path();
+        Pt start = route.start();
+        path.getElements().add(new MoveTo(start.x() + dx, start.y() + dy));
+        for (Segment segment : route.segments()) {
+            Pt to = segment.to();
+            if (segment instanceof Cubic c) {
+                path.getElements().add(new CubicCurveTo(c.c1().x() + dx, c.c1().y() + dy,
+                        c.c2().x() + dx, c.c2().y() + dy, to.x() + dx, to.y() + dy));
+            } else {
+                path.getElements().add(new LineTo(to.x() + dx, to.y() + dy));
+            }
+        }
+        return path;
+    }
+
+    /** {@code node} names {@code edge}: a click on it is {@link #setOnEdgeClicked}'s, a right click its menu. */
+    private void clickable(Node node, E edge) {
+        edgeOf.put(node, edge);
+        node.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
+            if (e.getButton() != MouseButton.PRIMARY || !e.isStillSincePress()) return;
+            onEdgeClicked.accept(edge);
+            e.consume();
+        });
     }
 
     private static Polygon head(Route route, boolean dashed, double dx, double dy) {
@@ -468,6 +557,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         scroller.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
             if (e.getButton() != MouseButton.SECONDARY && e.getButton() != MouseButton.MIDDLE) return;
             panning = true;
+            panMoved = false;
             panX = e.getX();
             panY = e.getY();
             panH = scroller.getHvalue();
@@ -476,6 +566,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         });
         scroller.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
             if (!panning) return;
+            if (Math.hypot(e.getX() - panX, e.getY() - panY) > CLICK_SLOP) panMoved = true;
             Bounds view = scroller.getViewportBounds();
             double spareW = content.getPrefWidth() * zoom.getX() - view.getWidth();
             double spareH = content.getPrefHeight() * zoom.getY() - view.getHeight();
@@ -487,7 +578,52 @@ public final class GraphCanvas<N, E> extends StackPane {
             if (!panning) return;
             panning = false;
             e.consume();
+            if (!panMoved && e.getButton() == MouseButton.SECONDARY) showMenu(e);
         });
+    }
+
+    /** The menu of the card or link under a right click, when the plugin gives it one. */
+    private void showMenu(MouseEvent e) {
+        ContextMenu menu = null;
+        for (Node at = e.getPickResult().getIntersectedNode(); at != null && at != this; at = at.getParent()) {
+            E edge = edgeOf.get(at);
+            if (edge != null) {
+                menu = edgeMenu.apply(edge);
+                break;
+            }
+            N node = nodeOfCell(at);
+            if (node != null) {
+                selected.set(node);
+                menu = nodeMenu.apply(node);
+                break;
+            }
+        }
+        if (shownMenu != null) shownMenu.hide();
+        shownMenu = menu;
+        if (menu != null) menu.show(this, e.getScreenX(), e.getScreenY());
+    }
+
+    /** The item whose card {@code cell} is, or null. */
+    private N nodeOfCell(Node cell) {
+        for (Map.Entry<String, StackPane> each : cellOf.entrySet()) {
+            if (each.getValue() == cell) return byId.get(each.getKey());
+        }
+        return null;
+    }
+
+    /** Zooms in a step about the middle of the view: the + button a window puts beside {@link #fit()}. */
+    public void zoomIn() {
+        zoomAboutMiddle(BUTTON_STEP);
+    }
+
+    /** Zooms out a step about the middle of the view. */
+    public void zoomOut() {
+        zoomAboutMiddle(1 / BUTTON_STEP);
+    }
+
+    private void zoomAboutMiddle(double factor) {
+        Bounds view = scroller.getViewportBounds();
+        zoomAbout(view.getWidth() / 2, view.getHeight() / 2, factor);
     }
 
     /** Scales by {@code factor}, keeping the graph point under the viewport point {@code (vx, vy)} where it is. */
