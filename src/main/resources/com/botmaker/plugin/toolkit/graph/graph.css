@@ -61,6 +61,14 @@
     -fx-effect: dropshadow(gaussian, -bm-graph-selected, 16, 0.6, 0, 0);
 }
 
+/* The box a left drag on the empty canvas draws: the cards it touches are selected. */
+.graph-band {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-graph-selected;
+    -fx-stroke-width: 1.2;
+    -fx-stroke-dash-array: 4 3;
+}
+
 .graph-minimap {
     -fx-background-color: -bm-graph-minimap;
     -fx-border-color: -bm-divider;

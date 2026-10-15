@@ -134,6 +134,19 @@ public final class GraphLayout {
             return box;
         }
 
+        /**
+         * This placement with each card {@code pins} names at the corner it gives instead: cards moved by hand. A pin
+         * for a card that is hidden or not placed is ignored.
+         */
+        public Placement pinned(Map<String, Pt> pins) {
+            if (pins.isEmpty()) return this;
+            Map<String, Pt> moved = new LinkedHashMap<>(at);
+            pins.forEach((id, p) -> {
+                if (p != null && moved.containsKey(id)) moved.put(id, p);
+            });
+            return new Placement(moved, hidden, crossings);
+        }
+
         /** This placement, worked out left to right, put back the way {@code direction} runs. */
         Placement flip(Direction direction) {
             if (direction == Direction.RIGHT) return this;

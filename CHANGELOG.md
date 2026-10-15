@@ -9,6 +9,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`GraphCanvas` cards move by hand.**
+  - A left drag moves a card, or every selected card when it is one of them.
+  - Ctrl or Shift+click adds a card to the selection or takes it out (`selection()`). A left drag on the empty canvas
+    selects what its box touches. Esc, or a click on the empty canvas, clears it.
+  - The canvas keeps the moved corners as pins over the layout and calls `setOnMoved`. A plugin that keeps them hands
+    them back with `setPinned`. `GraphLayout.Placement.pinned` does the same outside JavaFX.
+- **`GraphCanvas` view.**
+  - The wheel zooms without Ctrl; Shift+wheel scrolls sideways.
+  - A graph smaller than the view sits in its middle, so Fit no longer leaves it in the top-left corner.
+  - A card's or a link's menu closes on a press anywhere else in the window.
+
 - **`GraphCanvas` links and menus**: `setOnEdgeClicked` (a click on a link or its label), `setMenus` (a right-click
   menu per card and per link; a right-drag still pans), `zoomIn`/`zoomOut` about the middle, and
   `viewportProperty()`. Cards are cached as bitmaps, so panning a large graph no longer lags.
