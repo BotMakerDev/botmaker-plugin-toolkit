@@ -11,17 +11,24 @@ import com.botmaker.plugin.toolkit.graph.Routes.Route;
 import com.botmaker.plugin.toolkit.graph.Routes.Segment;
 import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -46,6 +53,7 @@ import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.paint.Paint;
@@ -96,7 +104,8 @@ import java.util.function.Predicate;
  *       card's or the link's menu ({@link #setMenus}), the minimap moves the view; {@link #fit()} shows everything,
  *       and a graph smaller than the view sits in its middle.</li>
  *   <li><b>Search</b>: {@link #find} marks the matching cards and brings the first into view;
- *       {@link #searchField} is a field wired to it.</li>
+ *       {@link #searchField(Function)} is a field wired to it. {@link #searchField(Function, Function)} lists its
+ *       hits under the field instead, and a hit picked zooms its card to a readable size ({@link #zoomTo}).</li>
  *   <li><b>Export</b>: {@link #savePng} writes the whole graph at 1:1, whatever the zoom.</li>
  * </ul>
  *
@@ -158,6 +167,13 @@ public final class GraphCanvas<N, E> extends StackPane {
     /** How wide a link takes a click: its own stroke is thinner than a pointer aims. */
     private static final double HIT_WIDTH = 12;
     private static final double MINIMAP_MAX = 170;
+    /** The zoom a picked search hit is shown at: a card's text reads at it. */
+    private static final double READABLE = 1;
+    private static final Duration ZOOM_TIME = Duration.millis(250);
+    /** The most hits the search lists; the rest are marked on the map only. */
+    private static final int MOST_HITS = 12;
+    /** How much of a long term a hit shows, around what matched. */
+    private static final int HIT_TEXT = 48;
     private static final double HEAD = 7;
 
     private final Function<N, String> id;
@@ -198,6 +214,10 @@ public final class GraphCanvas<N, E> extends StackPane {
     private final Rectangle band = new Rectangle();
     private List<N> matches = List.of();
     private int matchAt;
+    /** The zoom {@link #zoomTo} is easing, stopped by the next one. */
+    private Timeline zooming;
+    /** The listing search's own search again, over the items {@link #show} gave; nothing without one. */
+    private Runnable researched = () -> {};
 
     private final ListChangeListener<String> themeWatch = c -> Platform.runLater(this::paintGrid);
     private Parent themedRoot;
@@ -335,6 +355,8 @@ public final class GraphCanvas<N, E> extends StackPane {
         this.nodes = List.copyOf(nodes);
         this.edges = List.copyOf(edges);
         relayout(true);
+        // An open search lists the items as they are now, never the ones a redraw replaced.
+        researched.run();
     }
 
     /** Each item's named ports, as offsets along the side its links leave from. None by default. */
@@ -960,6 +982,7 @@ public final class GraphCanvas<N, E> extends StackPane {
 
     /** Scales by {@code factor}, keeping the graph point under the viewport point {@code (vx, vy)} where it is. */
     private void zoomAbout(double vx, double vy, double factor) {
+        stopZooming();
         double next = Math.clamp(zoom.getX() * factor, MIN_ZOOM, MAX_ZOOM);
         if (next == zoom.getX()) return;
         Pt anchor = viewToContent(vx, vy);
@@ -998,6 +1021,7 @@ public final class GraphCanvas<N, E> extends StackPane {
 
     /** Zooms so the whole graph shows, never above 1:1, and centres it. */
     public void fit() {
+        stopZooming();
         Bounds view = scroller.getViewportBounds();
         if (view.getWidth() <= 0 || content.getPrefWidth() <= 0) return;
         double fit = Math.min(1, Math.min(view.getWidth() / content.getPrefWidth(),
@@ -1013,6 +1037,38 @@ public final class GraphCanvas<N, E> extends StackPane {
         if (box == null) return;
         Bounds view = scroller.getViewportBounds();
         scrollSo(box.centre(), view.getWidth() / 2, view.getHeight() / 2);
+    }
+
+    /**
+     * Zooms to {@code scale} with the card of the item {@code itemId} in the middle of the view, eased over a quarter
+     * second: what a picked search hit does.
+     */
+    public void zoomTo(String itemId, double scale) {
+        Box box = placed.get(itemId);
+        if (box == null) return;
+        stopZooming();
+        Bounds view = scroller.getViewportBounds();
+        Pt from = viewToContent(view.getWidth() / 2, view.getHeight() / 2);
+        Pt to = box.centre();
+        double was = zoom.getX();
+        double is = Math.clamp(scale, MIN_ZOOM, MAX_ZOOM);
+        DoubleProperty done = new SimpleDoubleProperty();
+        done.addListener((o, before, now) -> {
+            double f = now.doubleValue();
+            // Scaled evenly: a zoom from far out does not rush its first frames.
+            setZoom(was * Math.pow(is / was, f));
+            Bounds shown = scroller.getViewportBounds();
+            scrollSo(new Pt(from.x() + (to.x() - from.x()) * f, from.y() + (to.y() - from.y()) * f),
+                    shown.getWidth() / 2, shown.getHeight() / 2);
+        });
+        zooming = new Timeline(new KeyFrame(ZOOM_TIME, new KeyValue(done, 1, Interpolator.EASE_BOTH)));
+        zooming.play();
+    }
+
+    /** Stops {@link #zoomTo}'s easing where it is: a zoom or Fit of the user's own wins over it. */
+    private void stopZooming() {
+        if (zooming != null) zooming.stop();
+        zooming = null;
     }
 
     private void markSelected() {
@@ -1049,6 +1105,149 @@ public final class GraphCanvas<N, E> extends StackPane {
             bringIn(matches.get(matchAt));
         });
         return field;
+    }
+
+    /** One search hit: the item, and the term of it that matched, empty when its first (its name) did. */
+    public record Hit<N>(N node, String matched) {}
+
+    /**
+     * A search field that lists its hits under it, over the canvas's top-left corner, as {@code row} draws each: up
+     * to twelve, picked with the arrows and Enter or a click, and a hit picked is selected and zoomed to a readable
+     * size. Every hit is marked on the map, listed or not. Esc clears the field and fits the map again.
+     *
+     * <p>{@code terms} is what an item is found by, its name first: a name that matches lists it above one whose
+     * other terms do, and a hit says which term matched when it was not the name. A term after the name may begin
+     * with a label and a space ({@code input beerBuy}): the hit shows the label, and only the rest is searched.
+     *
+     * <p>Called once per canvas: its list sits over the canvas's corner for the canvas's life.
+     */
+    public TextField searchField(Function<N, List<String>> terms, Function<Hit<N>, Node> row) {
+        TextField field = new TextField();
+        field.setPromptText("Find…");
+        field.getStyleClass().add("graph-search");
+        VBox list = new VBox();
+        list.getStyleClass().add("graph-results");
+        list.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        list.setVisible(false);
+        StackPane.setAlignment(list, Pos.TOP_LEFT);
+        StackPane.setMargin(list, new Insets(4, 0, 0, 8));
+        getChildren().add(list);
+        List<Hit<N>> shown = new ArrayList<>();
+        int[] at = {0};
+        Consumer<Hit<N>> pick = hit -> {
+            list.setVisible(false);
+            selected.set(hit.node());
+            zoomTo(id.apply(hit.node()), READABLE);
+        };
+        Runnable draw = () -> {
+            List<Node> rows = new ArrayList<>();
+            for (int i = 0; i < shown.size(); i++) {
+                Hit<N> hit = shown.get(i);
+                StackPane cell = new StackPane(row.apply(hit));
+                cell.getStyleClass().add("graph-result");
+                cell.setAlignment(Pos.CENTER_LEFT);
+                cell.pseudoClassStateChanged(SELECTED, i == at[0]);
+                cell.setOnMousePressed(e -> {
+                    pick.accept(hit);
+                    e.consume();
+                });
+                rows.add(cell);
+            }
+            list.getChildren().setAll(rows);
+            list.setVisible(!shown.isEmpty() && field.isFocused());
+        };
+        Consumer<Boolean> search = again -> {
+            List<Hit<N>> all = hits(nodes, terms, field.getText());
+            matches = all.stream().map(Hit::node).toList();
+            matchAt = 0;
+            markMatches();
+            shown.clear();
+            shown.addAll(all.subList(0, Math.min(MOST_HITS, all.size())));
+            // Searched again after a redraw: the row picked stays, as far as the list still reaches.
+            at[0] = again ? Math.min(at[0], Math.max(0, shown.size() - 1)) : 0;
+            if (again && !list.isVisible()) list.getChildren().clear();
+            else draw.run();
+        };
+        field.textProperty().addListener((o, was, is) -> search.accept(false));
+        researched = () -> {
+            if (!field.getText().isBlank()) search.accept(true);
+        };
+        field.focusedProperty().addListener((o, was, is) -> list.setVisible(is && !shown.isEmpty()));
+        field.setOnMouseClicked(e -> list.setVisible(!shown.isEmpty()));
+        field.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            switch (e.getCode()) {
+                case DOWN, UP -> {
+                    if (shown.isEmpty()) return;
+                    at[0] = Math.clamp(at[0] + (e.getCode() == KeyCode.DOWN ? 1 : -1), 0, shown.size() - 1);
+                    draw.run();
+                }
+                case ENTER -> {
+                    if (shown.isEmpty()) return;
+                    pick.accept(shown.get(at[0]));
+                }
+                case ESCAPE -> {
+                    // An empty field leaves the view as the user set it.
+                    if (field.getText().isEmpty()) return;
+                    field.clear();
+                    fit();
+                }
+                default -> {
+                    return;
+                }
+            }
+            e.consume();
+        });
+        // A press anywhere else on the canvas puts the list away; the map's own gesture goes on.
+        addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (!(e.getTarget() instanceof Node target) || !within(target, list)) list.setVisible(false);
+        });
+        return field;
+    }
+
+    /** Whether {@code node} is {@code holder} or inside it. */
+    private static boolean within(Node node, Node holder) {
+        for (Node at = node; at != null; at = at.getParent()) {
+            if (at == holder) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The items whose {@code terms} hold {@code query}, ignoring case: those whose name (their first term) begins with
+     * it, then those whose name holds it, then those another term matched, each group in {@code nodes}' order.
+     */
+    static <N> List<Hit<N>> hits(List<N> nodes, Function<N, List<String>> terms, String query) {
+        String wanted = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
+        if (wanted.isEmpty()) return List.of();
+        List<Hit<N>> starts = new ArrayList<>();
+        List<Hit<N>> holds = new ArrayList<>();
+        List<Hit<N>> others = new ArrayList<>();
+        for (N node : nodes) {
+            List<String> said = terms.apply(node);
+            for (int i = 0; i < said.size(); i++) {
+                // One line however the term was written: a hit is a row.
+                String term = Objects.toString(said.get(i), "").strip().replaceAll("\\s+", " ");
+                String low = term.toLowerCase(Locale.ROOT);
+                int label = i == 0 ? 0 : low.indexOf(' ') + 1;
+                int found = low.indexOf(wanted, label);
+                if (found < 0) continue;
+                if (i > 0) others.add(new Hit<>(node, around(term, found, wanted.length())));
+                else (found == 0 ? starts : holds).add(new Hit<>(node, ""));
+                break;
+            }
+        }
+        List<Hit<N>> all = new ArrayList<>(starts);
+        all.addAll(holds);
+        all.addAll(others);
+        return all;
+    }
+
+    /** {@code term}, or of a long one the part around what matched at {@code found}, cut ends marked. */
+    static String around(String term, int found, int length) {
+        if (term.length() <= HIT_TEXT) return term;
+        int from = Math.clamp(found + length / 2 - HIT_TEXT / 2, 0, term.length() - HIT_TEXT);
+        return (from > 0 ? "…" : "") + term.substring(from, from + HIT_TEXT).strip()
+                + (from + HIT_TEXT < term.length() ? "…" : "");
     }
 
     private void bringIn(N node) {

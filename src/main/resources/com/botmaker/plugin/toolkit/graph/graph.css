@@ -78,6 +78,31 @@
     -fx-opacity: 0.92;
 }
 
+/* The search's hits, listed under its field over the canvas's corner; the one Enter picks is barred. */
+.graph-results {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: -bm-divider;
+    -fx-border-width: 1;
+    -fx-padding: 2;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 8, 0, 0, 2);
+}
+
+.graph-result {
+    -fx-padding: 3 8 3 6;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 0 3;
+    -fx-cursor: hand;
+}
+
+.graph-result:hover {
+    -fx-background-color: -bm-graph-minimap;
+}
+
+.graph-result:selected {
+    -fx-border-color: -bm-graph-selected;
+    -fx-background-color: -bm-graph-minimap;
+}
+
 .graph-minimap-card {
     -fx-fill: -bm-muted;
 }

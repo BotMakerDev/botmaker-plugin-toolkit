@@ -9,6 +9,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`GraphCanvas` search lists its hits and zooms to one.**
+  - `searchField(terms, row)` lists up to 12 hits under the field, each drawn by `row`. Each item is found by
+    several terms, its name first. A name match lists above a match on another term, and the hit (`Hit`) says
+    which term matched.
+  - The arrows and Enter, or a click, pick a hit: its card is selected and zoomed to 1:1. Esc clears the field and
+    fits the map again. Every hit is marked on the map, listed or not.
+  - `zoomTo(id, scale)` centres a card at a scale, eased over a quarter second.
 - **`GraphCanvas` cards move by hand.**
   - A left drag moves a card, or every selected card when it is one of them.
   - Ctrl or Shift+click adds a card to the selection or takes it out (`selection()`). A left drag on the empty canvas
