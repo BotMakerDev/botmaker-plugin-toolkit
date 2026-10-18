@@ -59,6 +59,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Build
 
+- **JavaFX 27** (2026-10-18), from 25.0.4, the contract's version; still `provided`.
 - **JitPack builds with `.jitpack/build.sh`**, the umbrella's `tools/jitpack/build.sh`: Maven 3.9.9 and every
   dependency from Google's mirror of Maven Central first, with backoff and Maven's 429 retry, so Central's
   `429 Too Many Requests` no longer loses a tag. The statx shim comes with it.
