@@ -5,6 +5,15 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **`ManagedHandle.of` takes a `ManagedMethod`, and `ManagedSet.of` a `ManagedOpenSet`** (breaking, with contract
+  0.11.0's sealed `ManagedValue`). Handing either the wrong shape no longer compiles; it threw before. Type the
+  plugin's field by what its steps return (`ManagedMethod<Flow> RUN = ManagedValue.method(…)…`).
+  `ManagedSet.byGroup` answers empty for any set but `ofEnumGroups`.
+
 ## [0.9.0] — 2026-10-18
 
 ### Added

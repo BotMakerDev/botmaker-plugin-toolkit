@@ -2,6 +2,7 @@ package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedValue;
 
 import java.util.Locale;
@@ -26,26 +27,23 @@ import java.util.Optional;
  */
 public final class ManagedHandle<T> {
 
-    private final ManagedValue<T> value;
+    private final ManagedMethod<T> value;
 
-    private ManagedHandle(ManagedValue<T> value) {
+    private ManagedHandle(ManagedMethod<T> value) {
         this.value = value;
     }
 
     /**
-     * A handle on {@code value}, which must be a method-shaped value rather than an open set or a parameter,
-     * whose value the Parameters window and the Runner edit.
+     * A handle on the method value {@code value}: an open set has {@link ManagedSet}, and a parameter's value the
+     * Parameters window and the Runner edit.
      */
-    public static <T> ManagedHandle<T> of(ManagedValue<T> value) {
-        if (value == null || value.shape() != ManagedValue.Shape.METHOD) {
-            throw new IllegalArgumentException("a handle reads one method's value; an open set or a parameter"
-                    + " has none");
-        }
+    public static <T> ManagedHandle<T> of(ManagedMethod<T> value) {
+        if (value == null) throw new IllegalArgumentException("a handle reads one method's value; none given");
         return new ManagedHandle<>(value);
     }
 
     /** The declaration this reads and writes. */
-    public ManagedValue<T> value() {
+    public ManagedMethod<T> value() {
         return value;
     }
 

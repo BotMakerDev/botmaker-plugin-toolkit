@@ -3,6 +3,7 @@ package com.botmaker.plugin.toolkit;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedOpenSet;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
@@ -21,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ManagedSetTest {
 
-    private static final ManagedValue<String> WORDS =
+    private static final ManagedOpenSet<String> WORDS =
             ManagedValue.openSet(TestValue.Id.WORDS).of(String.class).in("Words").because("Mine.");
 
     /** A project holding the open set {@code @TestValue(WORDS)}, each constant a String; records every call. */
@@ -136,9 +137,9 @@ class ManagedSetTest {
                 "Pick a word", null, null));
     }
 
+    /** A method's value is no set: {@code of} takes an open set, so passing one does not compile. */
     @Test
-    void aMethodsValueIsNoSet() {
-        assertThrows(IllegalArgumentException.class, () -> ManagedSet.of(
-                ManagedValue.method(TestValue.Id.GREETING).in("Values").holds(String.class, "hi").because("Mine.")));
+    void noSetIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> ManagedSet.of(null));
     }
 }

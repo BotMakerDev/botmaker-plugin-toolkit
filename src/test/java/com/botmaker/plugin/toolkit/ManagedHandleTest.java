@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ManagedHandleTest {
 
-    private static final ManagedValue<String> GREETING =
+    private static final ManagedMethod<String> GREETING =
             ManagedValue.method(TestValue.Id.GREETING).in("Values").holds(String.class, "hello").because("Mine.");
 
     /** A project holding one {@code @TestValue(GREETING)} String, created only when asked. */
@@ -85,10 +86,9 @@ class ManagedHandleTest {
                 handle.write(null, "hi"));
     }
 
+    /** An open set has no value to handle: {@code of} takes a method value, so passing one does not compile. */
     @Test
-    void anOpenSetHasNoValueToHandle() {
-        assertThrows(IllegalArgumentException.class,
-                () -> ManagedHandle.of(ManagedValue.openSet(TestValue.Id.PICTURES).of(String.class).in("Pictures")
-                        .because("Mine.")));
+    void noValueIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> ManagedHandle.of(null));
     }
 }

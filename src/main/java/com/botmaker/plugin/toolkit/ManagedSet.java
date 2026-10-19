@@ -1,6 +1,7 @@
 package com.botmaker.plugin.toolkit;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedOpenSet;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
@@ -29,22 +30,20 @@ import java.util.Optional;
  */
 public final class ManagedSet<E> {
 
-    private final ManagedValue<E> set;
+    private final ManagedOpenSet<E> set;
 
-    private ManagedSet(ManagedValue<E> set) {
+    private ManagedSet(ManagedOpenSet<E> set) {
         this.set = set;
     }
 
-    /** The set {@code set} declares, which must be an open set rather than one method's value. */
-    public static <E> ManagedSet<E> of(ManagedValue<E> set) {
-        if (set == null || !set.isOpenSet()) {
-            throw new IllegalArgumentException("a managed set changes an open set; a method's value has one value");
-        }
+    /** The open set {@code set} declares. */
+    public static <E> ManagedSet<E> of(ManagedOpenSet<E> set) {
+        if (set == null) throw new IllegalArgumentException("a managed set changes an open set; none given");
         return new ManagedSet<>(set);
     }
 
     /** The declaration this changes. */
-    public ManagedValue<E> value() {
+    public ManagedOpenSet<E> value() {
         return set;
     }
 
@@ -163,9 +162,12 @@ public final class ManagedSet<E> {
         return host(values).createMethod(set, group, className, method);
     }
 
-    /** The plugin's value of the nested enum {@code group}, as a {@code G}; see {@link ManagedValue#byGroup}. */
+    /**
+     * The plugin's value of the nested enum {@code group}, as a {@code G}; see
+     * {@link ManagedOpenSet.EnumGroups#byGroup}. Empty for any other kind of set.
+     */
     public <G> Optional<G> byGroup(Class<G> as, String group) {
-        return set.byGroup(as, group);
+        return set instanceof ManagedOpenSet.EnumGroups<E> groups ? groups.byGroup(as, group) : Optional.empty();
     }
 
     private static PluginValues host(PluginValues values) {
