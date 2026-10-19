@@ -13,6 +13,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   0.11.0's sealed `ManagedValue`). Handing either the wrong shape no longer compiles; it threw before. Type the
   plugin's field by what its steps return (`ManagedMethod<Flow> RUN = ManagedValue.method(…)…`).
   `ManagedSet.byGroup` answers empty for any set but `ofEnumGroups`.
+- **`graph.GraphCanvas` is split into parts**, with its public API and behaviour unchanged. The 1343-line class
+  now lays out and draws the cards, and package-private parts hold the rest: `Viewport` (zoom and pan),
+  `Selection`, `CardGestures` (click, drag, box), `LinkLayer`, `DotGrid`, `Minimap` and `GraphSearch`.
 
 ## [0.9.0] — 2026-10-18
 
