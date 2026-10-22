@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +182,34 @@ public final class Routes {
             Double at = port == null ? null : card.ports().get(port);
             return new Pt(right() - inset, y + (at == null ? card.height() / 2 : at));
         }
+    }
+
+    /**
+     * The path of every link whose two cards both have a place in {@code at}, in order: a link whose path in
+     * {@code paths} (by index, one for one with {@code links}) has two points or more is drawn along it with its
+     * corners rounded, and the rest are routed.
+     */
+    public static List<Route> of(List<Card> cards, Map<String, Pt> at, List<Link> links, List<List<Pt>> paths,
+                                 Direction direction, Rules rules) {
+        Set<String> placed = new HashSet<>();
+        for (Card card : cards) if (at.containsKey(card.id())) placed.add(card.id());
+        List<Link> shown = new ArrayList<>();
+        List<List<Pt>> given = new ArrayList<>();
+        List<Link> toRoute = new ArrayList<>();
+        for (int i = 0; i < links.size(); i++) {
+            Link link = links.get(i);
+            if (!placed.contains(link.from()) || !placed.contains(link.to())) continue;
+            List<Pt> path = i < paths.size() && paths.get(i).size() >= 2 ? paths.get(i) : null;
+            shown.add(link);
+            given.add(path);
+            if (path == null) toRoute.add(link);
+        }
+        Iterator<Route> routed = of(cards, at, toRoute, direction, rules).iterator();
+        List<Route> routes = new ArrayList<>();
+        for (int i = 0; i < shown.size(); i++) {
+            routes.add(given.get(i) == null ? routed.next() : new Route(shown.get(i), rounded(given.get(i))));
+        }
+        return routes;
     }
 
     /** The path of every link whose two cards both have a place in {@code at}. */

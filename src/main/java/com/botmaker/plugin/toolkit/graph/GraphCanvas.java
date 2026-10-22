@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -110,7 +111,10 @@ public final class GraphCanvas<N, E> extends StackPane {
         }
     }
 
-    /** Places the measured cards, from the solid links: a {@link LayeredLayout} call, as a rule. */
+    /**
+     * Places the measured cards, from the solid links: a {@link LayeredLayout} call, as a rule. A layout that draws
+     * links too hands their paths over in the {@link Placement}, and those are drawn as given.
+     */
     @FunctionalInterface
     public interface Arrange {
 
@@ -515,15 +519,22 @@ public final class GraphCanvas<N, E> extends StackPane {
     private List<Route> routesOf(Placement at, List<Arrow> drawn, List<E> drawnEdges) {
         Set<String> shownIds = new HashSet<>(at.at().keySet());
         shownIds.removeAll(at.hidden());
+        List<Link> drawnLinks = new ArrayList<>();
+        List<List<Pt>> paths = new ArrayList<>();
+        // The layout's paths are by link, one for each edge that runs so: counted over every edge, drawn or not.
+        Map<Link, Integer> seen = new HashMap<>();
         for (int i = 0; i < arrows.size(); i++) {
             Arrow a = arrows.get(i);
+            Link link = new Link(a.from(), a.port(), a.to());
+            int nth = seen.merge(link, 1, Integer::sum) - 1;
             if ((showDashed || !a.dashed()) && shownIds.contains(a.from()) && shownIds.contains(a.to())) {
                 drawn.add(a);
                 drawnEdges.add(arrowEdges.get(i));
+                drawnLinks.add(link);
+                paths.add(at.path(link, nth));
             }
         }
-        List<Link> drawnLinks = drawn.stream().map(a -> new Link(a.from(), a.port(), a.to())).toList();
-        return Routes.of(cards, at.at(), drawnLinks, direction, rules);
+        return Routes.of(cards, at.at(), drawnLinks, paths, direction, rules);
     }
 
     /** Puts each card where {@code at} places it, shifted onto the canvas; a hidden one is hidden. */

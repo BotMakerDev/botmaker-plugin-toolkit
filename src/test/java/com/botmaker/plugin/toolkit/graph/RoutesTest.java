@@ -108,6 +108,21 @@ class RoutesTest {
     }
 
     @Test
+    void aPathGivenIsDrawnAsGivenAndTheRestRoutedInOrder() {
+        Link given = Link.of("a", "b");
+        Link routed = Link.of("b", "a");
+        List<Pt> path = List.of(new Pt(100, 130), new Pt(175, 130), new Pt(175, 0), new Pt(500, 0), new Pt(500, 130));
+        List<Route> routes = Routes.of(CARDS, AT, List.of(routed, given), List.of(List.of(), path), Direction.RIGHT,
+                Routes.Rules.DEFAULT);
+
+        assertEquals(List.of(routed, given), routes.stream().map(Route::link).toList());
+        assertEquals(new Pt(100, 130), routes.get(1).start());
+        assertEquals(new Pt(500, 130), routes.get(1).end());
+        assertTrue(routes.get(1).sample(3).stream().allMatch(p -> p.y() <= 130.5), "it keeps to the path above");
+        assertEquals(new Pt(600, 130), routes.getFirst().start(), "the other is routed as before");
+    }
+
+    @Test
     void theExtentHoldsCardsAndRoutes() {
         List<Route> routes = Routes.of(CARDS, AT, List.of(Link.of("b", "a")), Direction.RIGHT, Routes.Rules.DEFAULT);
         Box extent = Routes.extent(CARDS, AT, routes);

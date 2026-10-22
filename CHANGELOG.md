@@ -26,10 +26,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - A link within one rank, or onto its own card, hooks round beside it. A link from a named port still goes around.
   - `GraphCanvas.setRules` routes with them. `Loops.AROUND`, the old way, stays the default, so the flow editor is
     unchanged.
+- **A layout can hand the canvas its links' paths** (`GraphLayout.Placement.paths`):
+  - A plugin that lays out with a library of its own (the SDK's screen map, by ELK) gives each link's path, one
+    for each edge that runs between the same two cards, in the order the edges are given.
+  - The canvas draws a given path with its corners rounded, and routes the links that have none.
+  - A card moved, by a drag or a pin, drops the paths of its links, and those are routed.
+  - `Routes.of` takes the paths one for one with the links. The three-part `Placement` constructor stays.
 
 ### Removed
 
-- **`graph.TreeLayout`** (breaking): the screen map, its one caller, is laid out by `LayeredLayout` now.
+- **`graph.TreeLayout`** (breaking): the screen map, its one caller, is laid out by ELK in the SDK now.
 
 ### Fixed
 

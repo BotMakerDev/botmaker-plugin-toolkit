@@ -155,9 +155,10 @@ final class CardGestures<N> {
             }
         }
         Placement placement = board.placement();
-        Map<String, Pt> at = new LinkedHashMap<>(placement.at());
-        dragStart.forEach((k, p) -> at.put(k, new Pt(p.x() + dx, p.y() + dy)));
-        dragged = new Placement(at, placement.hidden(), placement.crossings());
+        Map<String, Pt> moved = new LinkedHashMap<>();
+        dragStart.forEach((k, p) -> moved.put(k, new Pt(p.x() + dx, p.y() + dy)));
+        // Pinned, so the links of the dragged cards leave the layout's paths and follow them.
+        dragged = placement.pinned(moved);
         dragFrame = dragged;
         dragFrames.start();
     }

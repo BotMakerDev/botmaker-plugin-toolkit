@@ -1,6 +1,7 @@
 package com.botmaker.plugin.toolkit.graph;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,9 +12,10 @@ import java.util.Set;
  * places a layout gives the cards. {@link LayeredLayout} turns cards and links into a {@link Placement};
  * {@link Routes} draws each link between placed cards; {@link GraphCanvas} shows the result.
  *
- * <p>Our own layout and no layout library, the user's call (2026-10-14, held again 2026-10-22): the toolkit reaches
- * every bot through the SDK, and ELK would have brought EMF and Guava, 8.4 MB, into each one. The layered layout is
- * the one the SDK's flow editor proved; the screen map threads its ways back through it ({@link Loops#THROUGH}).
+ * <p>No layout library here: the toolkit is every plugin's dependency and has none of its own. The layered layout is
+ * the one the SDK's flow editor proved. A plugin that lays out with a library of its own (the SDK's screen map, by
+ * ELK, since 2026-10-22) hands its places and its links' paths over as a {@link Placement}, and the canvas draws
+ * them.
  *
  * <p>Every layout works left to right; {@link Direction#DOWN} is the same layout with the axes swapped, so a
  * port's offset runs along a card's right side going {@link Direction#RIGHT}, and along its bottom going down.
@@ -132,12 +134,30 @@ public final class GraphLayout {
      * @param at        each shown card's top-left corner; the block starts at 0, 0
      * @param hidden    the cards a collapsed card hides, which have no place
      * @param crossings the link crossings between neighbouring ranks, on the chosen order
+     * @param paths     the paths the layout drew, by link: one for each edge that runs so, in the order the edges
+     *                  are given to the canvas, from a start on one card's border through its bends to the other
+     *                  card's border, in level and upright legs; {@link Routes} routes an edge with no path, or an
+     *                  empty one
      */
-    public record Placement(Map<String, Pt> at, Set<String> hidden, int crossings) {
+    public record Placement(Map<String, Pt> at, Set<String> hidden, int crossings, Map<Link, List<List<Pt>>> paths) {
 
         public Placement {
             at = Collections.unmodifiableMap(new LinkedHashMap<>(at));
             hidden = Set.copyOf(hidden);
+            Map<Link, List<List<Pt>>> copied = new LinkedHashMap<>();
+            paths.forEach((link, each) -> copied.put(link, each.stream().map(List::copyOf).toList()));
+            paths = Collections.unmodifiableMap(copied);
+        }
+
+        /** The path of the {@code nth} edge that runs as {@code link} does, from 0; empty when it has none. */
+        public List<Pt> path(Link link, int nth) {
+            List<List<Pt>> each = paths.getOrDefault(link, List.of());
+            return nth < each.size() ? each.get(nth) : List.of();
+        }
+
+        /** A placement whose links {@link Routes} routes, all of them. */
+        public Placement(Map<String, Pt> at, Set<String> hidden, int crossings) {
+            this(at, hidden, crossings, Map.of());
         }
 
         /** The box the placed {@code cards} take; null when none is placed. */
@@ -152,15 +172,22 @@ public final class GraphLayout {
 
         /**
          * This placement with each card {@code pins} names at the corner it gives instead: cards moved by hand. A pin
-         * for a card that is hidden or not placed is ignored.
+         * for a card that is hidden or not placed is ignored. A link to or from a card a pin moves loses its path, and
+         * is routed: a pin within a pixel of the card's place moves nothing, as pins are kept to whole pixels.
          */
         public Placement pinned(Map<String, Pt> pins) {
             if (pins.isEmpty()) return this;
             Map<String, Pt> moved = new LinkedHashMap<>(at);
+            Set<String> shifted = new HashSet<>();
             pins.forEach((id, p) -> {
-                if (p != null && moved.containsKey(id)) moved.put(id, p);
+                Pt was = moved.get(id);
+                if (p == null || was == null) return;
+                moved.put(id, p);
+                if (Math.abs(p.x() - was.x()) > 1 || Math.abs(p.y() - was.y()) > 1) shifted.add(id);
             });
-            return new Placement(moved, hidden, crossings);
+            Map<Link, List<List<Pt>>> kept = new LinkedHashMap<>(paths);
+            kept.keySet().removeIf(link -> shifted.contains(link.from()) || shifted.contains(link.to()));
+            return new Placement(moved, hidden, crossings, kept);
         }
 
         /** This placement, worked out left to right, put back the way {@code direction} runs. */
@@ -168,7 +195,10 @@ public final class GraphLayout {
             if (direction == Direction.RIGHT) return this;
             Map<String, Pt> flipped = new LinkedHashMap<>();
             at.forEach((id, p) -> flipped.put(id, p.flip(direction)));
-            return new Placement(flipped, hidden, crossings);
+            Map<Link, List<List<Pt>>> flippedPaths = new LinkedHashMap<>();
+            paths.forEach((link, each) -> flippedPaths.put(link,
+                    each.stream().map(path -> path.stream().map(p -> p.flip(direction)).toList()).toList()));
+            return new Placement(flipped, hidden, crossings, flippedPaths);
         }
     }
 
