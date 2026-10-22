@@ -4,6 +4,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Card;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Gaps;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Link;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Loops;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 
@@ -26,7 +27,8 @@ import java.util.Set;
  * <p>A link that skips ranks holds a lane slot in each rank it crosses, so the cards there make room for it. The
  * order within each rank comes from barycenter sweeps, there and back, keyed by the port a link leaves from, and
  * the order with the fewest crossings is kept. Each rank is centred on the longest, and ranks are as far apart as
- * their widest card needs. Cards no link from a root reaches go in a grid below.
+ * their widest card needs. Cards no link from a root reaches go in a grid below. A link back keeps lane slots too
+ * when it is to be drawn back through the ranks ({@link Loops#THROUGH}).
  *
  * <p>Lifted from the SDK's flow editor (2026-10-14), where it was proved on real flows.
  */
@@ -56,6 +58,17 @@ public final class LayeredLayout {
      */
     public static Placement arrange(List<Card> cards, List<Link> links, List<String> roots, Direction direction,
                                     Gaps gaps, int sweeps) {
+        return arrange(cards, links, roots, direction, gaps, sweeps, Loops.AROUND);
+    }
+
+    /**
+     * Lays {@code cards} out as {@link #arrange(List, List, List, Direction, Gaps, int)} does, with the links back
+     * kept as {@code loops} says: {@link Loops#THROUGH} gives each a lane slot in every rank between its ends and
+     * counts it in the order of each rank, so it can be drawn back through them. Which links run back is decided by
+     * a walk from the roots that takes the links in the order listed: list the ones that make the work's shape first.
+     */
+    public static Placement arrange(List<Card> cards, List<Link> links, List<String> roots, Direction direction,
+                                    Gaps gaps, int sweeps, Loops loops) {
         Map<String, Card> byId = new LinkedHashMap<>();
         for (Card card : GraphLayout.flip(cards, direction)) byId.put(card.id(), card);
         List<Link> known = links.stream()
@@ -66,7 +79,7 @@ public final class LayeredLayout {
         int crossings = 0;
         double top = 0;
         if (!reachable.isEmpty()) {
-            Layered layered = Layered.of(reachable, known, byId, gaps);
+            Layered layered = Layered.of(reachable, known, byId, gaps, loops);
             crossings = layered.order(sweeps);
             top = layered.place(at) + gaps.across() * 2;
         }
@@ -118,13 +131,14 @@ public final class LayeredLayout {
         private final List<List<String>> layers = new ArrayList<>();
         private final Map<String, Integer> layerOf = new HashMap<>();
         private final List<Hop> hops = new ArrayList<>();
+        private int lanes;
 
         private Layered(Map<String, Card> cards, Gaps gaps) {
             this.cards = cards;
             this.gaps = gaps;
         }
 
-        static Layered of(List<String> reachable, List<Link> links, Map<String, Card> cards, Gaps gaps) {
+        static Layered of(List<String> reachable, List<Link> links, Map<String, Card> cards, Gaps gaps, Loops loops) {
             Layered layered = new Layered(cards, gaps);
             Map<String, Integer> layer = longestPathLayers(reachable, links);
             int max = 0;
@@ -132,23 +146,31 @@ public final class LayeredLayout {
             for (int l = 0; l <= max; l++) layered.layers.add(new ArrayList<>());
             for (String id : reachable) layered.add(id, layer.get(id));
 
-            int lanes = 0;
             for (Link link : links) {
                 Integer from = layer.get(link.from());
                 Integer to = layer.get(link.to());
-                if (from == null || to == null || to <= from) continue;   // a loop back goes around the block
-                String upper = link.from();
-                double fraction = cards.get(upper).portFraction(link.port());
-                for (int l = from + 1; l < to; l++) {
-                    String lane = LANE_PREFIX + lanes++;
-                    layered.add(lane, l);
-                    layered.hops.add(new Hop(upper, fraction, lane));
-                    upper = lane;
-                    fraction = 0.5;
+                if (from == null || to == null || to.equals(from)) continue;
+                if (to > from) {
+                    layered.chain(link.from(), cards.get(link.from()).portFraction(link.port()), from, link.to(), to);
+                } else if (loops == Loops.THROUGH && link.port() == null) {
+                    // Drawn from its own card's near side into the far side of the card it returns to: for the ranks
+                    // between, the same as a link the other way. A link from a port goes around the block.
+                    layered.chain(link.to(), 0.5, to, link.from(), from);
                 }
-                layered.hops.add(new Hop(upper, fraction, link.to()));
             }
             return layered;
+        }
+
+        /** The hops from {@code upper}, in rank {@code from}, to {@code lower}: a lane slot in each rank between. */
+        private void chain(String upper, double fraction, int from, String lower, int to) {
+            for (int l = from + 1; l < to; l++) {
+                String lane = LANE_PREFIX + lanes++;
+                add(lane, l);
+                hops.add(new Hop(upper, fraction, lane));
+                upper = lane;
+                fraction = 0.5;
+            }
+            hops.add(new Hop(upper, fraction, lower));
         }
 
         private void add(String node, int layer) {

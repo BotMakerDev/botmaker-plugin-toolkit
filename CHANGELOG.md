@@ -16,6 +16,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **`graph.GraphCanvas` is split into parts**, with its public API and behaviour unchanged. The 1343-line class
   now lays out and draws the cards, and package-private parts hold the rest: `Viewport` (zoom and pan),
   `Selection`, `CardGestures` (click, drag, box), `LinkLayer`, `DotGrid`, `Minimap` and `GraphSearch`.
+- **Links back can run back through the ranks** (`GraphLayout.Loops`):
+  - `LayeredLayout.arrange(…, Loops.THROUGH)` gives each link back a lane slot in every rank between its ends and
+    counts it when it orders each rank. Which links run back is decided by a walk that takes them in the order
+    listed.
+  - `Routes.Rules.with(Loops.THROUGH)` draws such a link out of its card's near side and back through a free gap in
+    each rank, into the far side of the card it returns to. Its corners are square and rounded, and each turn in a
+    channel is a step from the last.
+  - A link within one rank, or onto its own card, hooks round beside it. A link from a named port still goes around.
+  - `GraphCanvas.setRules` routes with them. `Loops.AROUND`, the old way, stays the default, so the flow editor is
+    unchanged.
+
+### Removed
+
+- **`graph.TreeLayout`** (breaking): the screen map, its one caller, is laid out by `LayeredLayout` now.
 
 ### Fixed
 

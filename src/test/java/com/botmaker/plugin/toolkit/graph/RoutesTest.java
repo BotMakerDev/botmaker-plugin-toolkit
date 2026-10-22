@@ -4,6 +4,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Box;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Card;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Link;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Loops;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.Routes.Route;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,29 @@ class RoutesTest {
         assertEquals(new Pt(600, 130), route.start());
         assertEquals(new Pt(0, 130), route.end());
         assertClear(route, "wall", "a", "b");
+    }
+
+    @Test
+    void aLinkBackThroughTheRanksLeavesItsNearSideAndEntersTheFarSide() {
+        Route route = Routes.of(CARDS, AT, List.of(Link.of("b", "a")), Direction.RIGHT,
+                Routes.Rules.DEFAULT.with(Loops.THROUGH)).getFirst();
+
+        assertEquals(new Pt(500, 130), route.start());
+        assertEquals(new Pt(100, 130), route.end());
+        assertClear(route, "wall", "a", "b");
+        // Past the wall and no further: not around the whole block.
+        assertTrue(route.bounds().minX() >= 100 && route.bounds().maxX() <= 500, route.bounds().toString());
+    }
+
+    @Test
+    void aLinkOntoItsOwnCardHooksBesideItWhenThrough() {
+        Route route = Routes.of(CARDS, AT, List.of(Link.of("a", "a")), Direction.RIGHT,
+                Routes.Rules.DEFAULT.with(Loops.THROUGH)).getFirst();
+
+        Box bounds = route.bounds();
+        assertTrue(bounds.minY() >= 100 && bounds.maxY() <= 160, bounds.toString());
+        assertTrue(bounds.minX() >= 100 && bounds.maxX() < 250, bounds.toString());
+        assertTrue(route.start().y() < route.end().y());
     }
 
     @Test

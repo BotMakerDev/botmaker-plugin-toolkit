@@ -8,12 +8,12 @@ import java.util.Set;
 
 /**
  * The shapes a graph layout works on, without JavaFX: cards with sizes and ports, links between them, and the
- * places a layout gives the cards. {@link LayeredLayout} and {@link TreeLayout} turn cards and links into a
- * {@link Placement}; {@link Routes} draws each link between placed cards; {@link GraphCanvas} shows the result.
+ * places a layout gives the cards. {@link LayeredLayout} turns cards and links into a {@link Placement};
+ * {@link Routes} draws each link between placed cards; {@link GraphCanvas} shows the result.
  *
- * <p>Our own layout and no layout library, the user's call (2026-10-14): the toolkit reaches every bot through
- * the SDK, and ELK would have brought EMF and Guava, 8.4 MB, into each one. The layered layout is the one the
- * SDK's flow editor proved; the tree layout is new for its screen map.
+ * <p>Our own layout and no layout library, the user's call (2026-10-14, held again 2026-10-22): the toolkit reaches
+ * every bot through the SDK, and ELK would have brought EMF and Guava, 8.4 MB, into each one. The layered layout is
+ * the one the SDK's flow editor proved; the screen map threads its ways back through it ({@link Loops#THROUGH}).
  *
  * <p>Every layout works left to right; {@link Direction#DOWN} is the same layout with the axes swapped, so a
  * port's offset runs along a card's right side going {@link Direction#RIGHT}, and along its bottom going down.
@@ -24,6 +24,22 @@ public final class GraphLayout {
 
     /** Which way links run: the way a layout puts each rank after the last. */
     public enum Direction { RIGHT, DOWN }
+
+    /** How a link that runs against the direction, or within one rank, is laid out and drawn. */
+    public enum Loops {
+        /**
+         * Out of its card's side, around the whole block, and in from behind; the ranks keep no room for it. A
+         * graph with a few loops reads best so: each stands apart from the work.
+         */
+        AROUND,
+        /**
+         * Back through the ranks between its ends, out of its card's near side and into the far side of the card it
+         * returns to, each rank it crosses keeping room for it; within one rank, a hook beside it. A graph with many
+         * ways back reads best so: each stays by the cards it joins instead of all of them wrapping the block. A
+         * link from a named port still goes {@link #AROUND}, as the port is on the far side.
+         */
+        THROUGH
+    }
 
     /** A point, unscaled. */
     public record Pt(double x, double y) {

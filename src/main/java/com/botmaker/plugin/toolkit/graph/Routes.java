@@ -4,14 +4,19 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Box;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Card;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Link;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Loops;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.ToDoubleFunction;
 
 /**
  * The path each link takes between placed cards, clear of every other card — computed from where the cards are
@@ -19,15 +24,21 @@ import java.util.Map;
  *
  * <p>A forward link crosses each rank of cards between its ends through a free gap, as flat S-curves. A link back,
  * or onto its own card, leaves forward, runs below or above the cards between its ends, and comes back into the
- * input side, with rounded corners. Lifted from the SDK's flow editor (2026-10-14).
+ * input side, with rounded corners. Lifted from the SDK's flow editor (2026-10-14). With {@link Loops#THROUGH} a
+ * link back instead runs back through a free gap in each rank between its ends, square with rounded corners, and a
+ * link within one rank hooks round beside it (2026-10-22, the screen map's ways back).
  */
 public final class Routes {
 
     /** How far a link keeps from a card it passes. */
     public static final double CLEAR = 18;
 
-    /** The spacing between links that go around the block on the same side. */
+    /** The spacing between links that go around the block on the same side, or turn in the same channel. */
     private static final double BACK_STEP = 10;
+    /** How many links back turn in one channel a step apart before they share a line again. */
+    private static final int LANES = 4;
+    /** How far above and below its card's middle a link onto its own card leaves and comes back. */
+    private static final double HOOK = 8;
     /** The spacing between links arriving at one card. */
     private static final double FAN = 4;
     /** The radius of a routed link's corners. */
@@ -41,10 +52,20 @@ public final class Routes {
      * @param portInset how far inside a card's edge a link starts and ends: a port dot's radius, or 0
      * @param top       the least height a link back may run at above the cards, so it stays on a surface that
      *                  only grows down; {@code -Infinity} for anywhere
+     * @param loops     how a link back, or within one rank, runs: {@link Loops#AROUND} unless said
      */
-    public record Rules(double portInset, double top) {
+    public record Rules(double portInset, double top, Loops loops) {
 
         public static final Rules DEFAULT = new Rules(0, Double.NEGATIVE_INFINITY);
+
+        public Rules(double portInset, double top) {
+            this(portInset, top, Loops.AROUND);
+        }
+
+        /** These rules with the links back run as {@code loops} says. */
+        public Rules with(Loops loops) {
+            return new Rules(portInset, top, loops);
+        }
     }
 
     /** One piece of a link's path. */
@@ -152,6 +173,8 @@ public final class Routes {
 
         double bottom() { return y + card.height(); }
 
+        double middle() { return y + card.height() / 2; }
+
         Pt in(double inset) { return new Pt(x + inset, y + card.height() / 2); }
 
         Pt out(String port, double inset) {
@@ -172,15 +195,49 @@ public final class Routes {
             }
         }
         List<Placed> placed = List.copyOf(byId.values());
-        Map<Link, Double> arrival = arrivals(byId, links, rules.portInset());
+        List<Link> shown = links.stream()
+                .filter(l -> byId.containsKey(l.from()) && byId.containsKey(l.to())).toList();
+        double inset = rules.portInset();
+
+        // Links back through the ranks: each one's rank by where the cards are now, not where a layout put them.
+        List<List<Placed>> columns = rules.loops() == Loops.THROUGH ? columns(placed) : List.of();
+        Map<String, Integer> columnOf = new HashMap<>();
+        for (int k = 0; k < columns.size(); k++) {
+            for (Placed card : columns.get(k)) columnOf.put(card.card().id(), k);
+        }
+        List<Link> returning = new ArrayList<>();
+        List<Link> threaded = new ArrayList<>();
+        for (Link link : shown) {
+            if (columns.isEmpty() || link.port() != null) continue;
+            int from = columnOf.get(link.from());
+            int to = columnOf.get(link.to());
+            if (to <= from) returning.add(link);
+            if (to < from) threaded.add(link);
+        }
+        Set<Link> back = new HashSet<>(returning);
+        Map<Link, Double> arrival = fan(byId, shown.stream().filter(l -> !back.contains(l)).toList(), Link::to,
+                l -> byId.get(l.from()).out(l.port(), inset).y());
+        Map<Link, Double> leaving = fan(byId, threaded, Link::from, l -> byId.get(l.to()).middle());
+        Map<Link, Double> returned = fan(byId, returning, Link::to, l -> byId.get(l.from()).middle());
+        int[] channels = new int[columns.size() + 1];
+
         int[] lanes = {0, 0};
         List<Route> routes = new ArrayList<>();
-        for (Link link : links) {
+        for (Link link : shown) {
             Placed from = byId.get(link.from());
             Placed to = byId.get(link.to());
-            if (from == null || to == null) continue;
-            Pt start = from.out(link.port(), rules.portInset());
-            Pt end = new Pt(to.in(rules.portInset()).x(), arrival.get(link));
+            if (back.contains(link)) {
+                int fromColumn = columnOf.get(link.from());
+                int toColumn = columnOf.get(link.to());
+                List<Pt> points = toColumn < fromColumn
+                        ? through(from, to, leaving.get(link), returned.get(link), inset, columns, fromColumn,
+                        toColumn, channels)
+                        : hook(from, to, returned.get(link), inset, columns, fromColumn, channels);
+                routes.add(new Route(link, rounded(points)).flip(direction));
+                continue;
+            }
+            Pt start = from.out(link.port(), inset);
+            Pt end = new Pt(to.in(inset).x(), arrival.get(link));
             Route route;
             if (from != to && end.x() - start.x() >= 2 * CLEAR) {
                 List<Placed> others = new ArrayList<>(placed);
@@ -209,25 +266,96 @@ public final class Routes {
         return box;
     }
 
-    /** Where each link meets its card: links into one card fan in a few pixels apart, by where they come from. */
-    private static Map<Link, Double> arrivals(Map<String, Placed> cards, List<Link> links, double inset) {
-        Map<String, List<Link>> byTarget = new LinkedHashMap<>();
-        for (Link link : links) {
-            if (cards.containsKey(link.from()) && cards.containsKey(link.to())) {
-                byTarget.computeIfAbsent(link.to(), k -> new ArrayList<>()).add(link);
-            }
-        }
-        Map<Link, Double> arrival = new HashMap<>();
-        byTarget.forEach((target, incoming) -> {
-            Placed to = cards.get(target);
-            incoming.sort(Comparator.comparingDouble(l -> cards.get(l.from()).out(l.port(), inset).y()));
-            double room = Math.max(0, to.height() / 2 - 2 * FAN);
-            for (int i = 0; i < incoming.size(); i++) {
-                double shift = Math.clamp((i - (incoming.size() - 1) / 2.0) * FAN, -room, room);
-                arrival.put(incoming.get(i), to.in(inset).y() + shift);
+    /**
+     * Where each link meets the card {@code side} names, one side of it: links meeting one card's side fan out a few
+     * pixels apart about its middle, in the order of {@code order} (where each comes from or goes to).
+     */
+    private static Map<Link, Double> fan(Map<String, Placed> cards, List<Link> links, Function<Link, String> side,
+                                         ToDoubleFunction<Link> order) {
+        Map<String, List<Link>> bySide = new LinkedHashMap<>();
+        for (Link link : links) bySide.computeIfAbsent(side.apply(link), k -> new ArrayList<>()).add(link);
+        Map<Link, Double> fanned = new HashMap<>();
+        bySide.forEach((id, meeting) -> {
+            Placed card = cards.get(id);
+            meeting.sort(Comparator.comparingDouble(order));
+            double room = Math.max(0, card.height() / 2 - 2 * FAN);
+            for (int i = 0; i < meeting.size(); i++) {
+                double shift = Math.clamp((i - (meeting.size() - 1) / 2.0) * FAN, -room, room);
+                fanned.put(meeting.get(i), card.middle() + shift);
             }
         });
-        return arrival;
+        return fanned;
+    }
+
+    /**
+     * A link back through the ranks: out of {@code from}'s near side into the channel before its rank, along a free
+     * gap in each rank between, and into {@code to}'s far side from the channel after its rank. A link turning in a
+     * channel turns {@link #BACK_STEP} further from the rank than the one before it there.
+     */
+    private static List<Pt> through(Placed from, Placed to, double startY, double endY, double inset,
+                                    List<List<Placed>> columns, int fromColumn, int toColumn, int[] channels) {
+        Pt start = new Pt(from.x() + inset, startY);
+        Pt end = new Pt(to.right() - inset, endY);
+        List<Pt> points = new ArrayList<>();
+        points.add(start);
+        double x = before(columns, fromColumn, channels);
+        points.add(new Pt(x, startY));
+        double span = start.x() - end.x();
+        for (int k = fromColumn - 1; k > toColumn; k--) {
+            List<Placed> column = columns.get(k);
+            double t = span > 0 ? (start.x() - (minX(column) + maxX(column)) / 2) / span : 0.5;
+            double y = freeY(column, startY + (endY - startY) * t, Double.NaN, Double.NaN);
+            points.add(new Pt(x, y));
+            x = before(columns, k, channels);
+            points.add(new Pt(x, y));
+        }
+        points.add(new Pt(x, endY));
+        points.add(end);
+        return points;
+    }
+
+    /**
+     * A link within one rank, or onto its own card: out of {@code from}'s far side, along the channel after the rank,
+     * and back into {@code to}'s far side. Onto its own card it leaves above the middle and comes back below.
+     */
+    private static List<Pt> hook(Placed from, Placed to, double endY, double inset, List<List<Placed>> columns,
+                                 int column, int[] channels) {
+        double startY = from.middle();
+        if (from == to) {
+            double hook = Math.min(HOOK, from.height() / 4);
+            startY -= hook;
+            endY = from.middle() + hook;
+        }
+        double x = column + 1 < columns.size()
+                ? Math.min(minX(columns.get(column + 1)), maxX(columns.get(column)) + lane(channels, column + 1))
+                : maxX(columns.get(column)) + lane(channels, column + 1);
+        return List.of(new Pt(from.right() - inset, startY), new Pt(x, startY), new Pt(x, endY),
+                new Pt(to.right() - inset, endY));
+    }
+
+    /** Where a link turns in the channel before column {@code k}: clear of it, and of the column before. */
+    private static double before(List<List<Placed>> columns, int k, int[] channels) {
+        double x = minX(columns.get(k)) - lane(channels, k);
+        return k > 0 ? Math.max(maxX(columns.get(k - 1)), x) : x;
+    }
+
+    /** How far from its rank the next link turning in channel {@code k} turns. */
+    private static double lane(int[] channels, int k) {
+        return (channels[k]++ % LANES) * BACK_STEP;
+    }
+
+    /** Where links passing {@code column} keep clear of it on the near side. */
+    private static double minX(List<Placed> column) {
+        double min = Double.MAX_VALUE;
+        for (Placed card : column) min = Math.min(min, card.x() - CLEAR);
+        return min;
+    }
+
+    /** Where links passing {@code column} keep clear of it on the far side. */
+    private static double maxX(List<Placed> column) {
+        double max = -Double.MAX_VALUE;
+        for (Placed card : column) max = Math.max(max, card.right() + CLEAR);
+        return max;
     }
 
     /**

@@ -51,8 +51,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * A graph to look at: cards the plugin draws, laid out by a {@link LayeredLayout} or {@link TreeLayout}, joined by
- * links routed clear of every card, on a dot grid the user pans and zooms. The plugin owns what a card shows and what
+ * A graph to look at: cards the plugin draws, laid out by a {@link LayeredLayout}, joined by links routed clear of
+ * every card ({@link #setRules}), on a dot grid the user pans and zooms. The plugin owns what a card shows and what
  * an edge means; this owns where they go and the gestures.
  *
  * <ul>
@@ -110,7 +110,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         }
     }
 
-    /** Places the measured cards, from the solid links: a {@link LayeredLayout} or {@link TreeLayout} call. */
+    /** Places the measured cards, from the solid links: a {@link LayeredLayout} call, as a rule. */
     @FunctionalInterface
     public interface Arrange {
 
@@ -135,6 +135,7 @@ public final class GraphCanvas<N, E> extends StackPane {
     private final Arrange arrange;
     private Function<N, Map<String, Double>> ports = n -> Map.of();
     private Direction direction = Direction.RIGHT;
+    private Routes.Rules rules = Routes.Rules.DEFAULT;
     private Consumer<N> onOpen = n -> {};
     private Function<N, ContextMenu> nodeMenu = n -> null;
     private Function<E, ContextMenu> edgeMenu = e -> null;
@@ -276,6 +277,14 @@ public final class GraphCanvas<N, E> extends StackPane {
     /** Which way the routes run: the direction {@code arrange} lays out in. {@link Direction#RIGHT} by default. */
     public void setDirection(Direction direction) {
         this.direction = direction;
+    }
+
+    /**
+     * How the links are routed: {@link Routes.Rules#DEFAULT} unless said. A layout that keeps room for links back
+     * ({@link GraphLayout.Loops#THROUGH}) wants the same {@code loops} here, or the room stays empty.
+     */
+    public void setRules(Routes.Rules rules) {
+        this.rules = rules;
     }
 
     /** Whether dashed links are drawn. Hiding them changes no card's place. */
@@ -514,7 +523,7 @@ public final class GraphCanvas<N, E> extends StackPane {
             }
         }
         List<Link> drawnLinks = drawn.stream().map(a -> new Link(a.from(), a.port(), a.to())).toList();
-        return Routes.of(cards, at.at(), drawnLinks, direction, Routes.Rules.DEFAULT);
+        return Routes.of(cards, at.at(), drawnLinks, direction, rules);
     }
 
     /** Puts each card where {@code at} places it, shifted onto the canvas; a hidden one is hidden. */

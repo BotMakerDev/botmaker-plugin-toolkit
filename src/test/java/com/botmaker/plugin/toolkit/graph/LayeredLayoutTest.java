@@ -5,7 +5,10 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Card;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Gaps;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Link;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Loops;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
+import com.botmaker.plugin.toolkit.graph.Routes.Route;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -32,6 +35,28 @@ class LayeredLayoutTest {
                 assertFalse(boxA.overlaps(boxB), a.id() + " overlaps " + b.id());
             }
         }
+    }
+
+    @Test
+    void aWayBackThreadsBackThroughTheRanksClearOfEveryCard() {
+        List<Card> cards = List.of(card("home"), card("a"), card("c"), card("d"), card("b"));
+        List<Link> links = List.of(Link.of("home", "a"), Link.of("home", "c"), Link.of("home", "d"),
+                Link.of("a", "b"), Link.of("b", "home"));
+        Placement placement = LayeredLayout.arrange(cards, links, List.of("home"), Direction.RIGHT, Gaps.DEFAULT,
+                LayeredLayout.SWEEPS, Loops.THROUGH);
+        Route back = Routes.of(cards, placement.at(), List.of(Link.of("b", "home")), Direction.RIGHT,
+                Routes.Rules.DEFAULT.with(Loops.THROUGH)).getFirst();
+
+        assertNoOverlap(cards, placement);
+        assertEquals(placement.at().get("b").x(), back.start().x(), 0.01);
+        assertEquals(placement.at().get("home").x() + 120, back.end().x(), 0.01);
+        for (Card card : cards) {
+            Box box = card.at(placement.at().get(card.id()));
+            for (Pt p : back.sample(3)) assertFalse(box.holds(p, 1), "through " + card.id() + " at " + p);
+        }
+        Box block = placement.extent(cards);
+        assertTrue(back.bounds().minY() >= block.minY() && back.bounds().maxY() <= block.maxY(),
+                "around the block: " + back.bounds());
     }
 
     @Test
