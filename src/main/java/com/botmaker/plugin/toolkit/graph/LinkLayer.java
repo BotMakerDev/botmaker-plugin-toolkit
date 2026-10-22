@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * {@link GraphCanvas}'s links: each routed edge's stroke, its arrowhead and its label, and the edge a click on one
@@ -36,6 +37,8 @@ final class LinkLayer<E> {
     /** How wide a link takes a click: its own stroke is thinner than a pointer aims. */
     private static final double HIT_WIDTH = 12;
     private static final double HEAD = 7;
+    /** How much of a faint link shows: there to follow, not to read. */
+    static final double FAINT = 0.15;
 
     /** One link drawn: its hit line, stroke and head, the label it carries (or null), and the route they follow. */
     private record Drawn(Path hit, Path path, Polygon head, Node label, Route route) {}
@@ -51,6 +54,8 @@ final class LinkLayer<E> {
     private double drawnX;
     private double drawnY;
     private CacheHint hint = CacheHint.QUALITY;
+    /** Which links are drawn full with their labels; the rest are faint, without. */
+    private Predicate<Arrow> lit = a -> true;
 
     /** The strokes, under the cards. */
     Group links() {
@@ -75,6 +80,27 @@ final class LinkLayer<E> {
     void setCacheHint(CacheHint hint) {
         this.hint = hint;
         for (Node label : labels.getChildren()) label.setCacheHint(hint);
+    }
+
+    /**
+     * Draws the links {@code lit} names full, with their labels, over the rest, which are faint and without theirs.
+     * Only opacity, visibility and order change: no link is routed or built again.
+     */
+    void light(Predicate<Arrow> lit) {
+        this.lit = lit;
+        for (int i = 0; i < drawn.size(); i++) light(drawn.get(i), drawnArrows.get(i));
+    }
+
+    private void light(Drawn link, Arrow a) {
+        boolean full = lit.test(a);
+        link.path().setOpacity(full ? 1 : FAINT);
+        link.head().setOpacity(full ? 1 : FAINT);
+        if (link.label() != null) link.label().setVisible(full);
+        if (!full) return;
+        // Over the faint ones, and first to take a click where they cross; in the order draw adds them.
+        link.hit().toFront();
+        link.path().toFront();
+        link.head().toFront();
     }
 
     /** Draws {@code routes}, moved by {@code (dx, dy)}: the route at an index is that of {@code arrows}' there. */
@@ -126,6 +152,7 @@ final class LinkLayer<E> {
         drawnArrows = List.copyOf(arrows.subList(0, now.size()));
         drawnX = dx;
         drawnY = dy;
+        light(lit);
     }
 
     /**

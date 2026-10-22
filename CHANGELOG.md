@@ -16,6 +16,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **`graph.GraphCanvas` is split into parts**, with its public API and behaviour unchanged. The 1343-line class
   now lays out and draws the cards, and package-private parts hold the rest: `Viewport` (zoom and pan),
   `Selection`, `CardGestures` (click, drag, box), `LinkLayer`, `DotGrid`, `Minimap` and `GraphSearch`.
+- **`GraphCanvas.setFocusLinks` draws links in focus**: at rest the solid links are full and the dashed ones faint
+  (15%), their labels hidden. The card under the pointer, or else the selected cards, light every link in and out of
+  them, labels included, over the rest, which go faint. Off by default. A change of focus routes nothing again: it
+  sets opacity, visibility and order only.
 - **Links back can run back through the ranks** (`GraphLayout.Loops`):
   - `LayeredLayout.arrange(…, Loops.THROUGH)` gives each link back a lane slot in every rank between its ends and
     counts it when it orders each rank. Which links run back is decided by a walk that takes them in the order

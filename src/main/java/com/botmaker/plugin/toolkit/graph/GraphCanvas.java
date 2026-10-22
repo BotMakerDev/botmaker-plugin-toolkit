@@ -66,7 +66,9 @@ import java.util.function.Predicate;
  *       hands them back with {@link #setPinned}.</li>
  *   <li><b>Links</b>: {@code arrow} says where each edge runs, whether it is dashed and what label rides on it. Only
  *       solid links shape the layout; dashed ones are drawn between the placed cards and can be hidden
- *       ({@link #setShowDashed}). A link or its label is clicked ({@link #setOnEdgeClicked}).</li>
+ *       ({@link #setShowDashed}). In focus ({@link #setFocusLinks}) only the links of the card under the pointer or
+ *       of the selected cards are drawn full, the solid ones when there are none, and the rest faint. A link or its
+ *       label is clicked ({@link #setOnEdgeClicked}).</li>
  *   <li><b>Gestures</b>: the wheel zooms about the cursor (Shift+wheel scrolls sideways), {@link #zoomIn()} and
  *       {@link #zoomOut()} about the middle, a right- or middle-drag pans, a right click that did not drag opens the
  *       card's or the link's menu ({@link #setMenus}), the minimap moves the view; {@link #fit()} shows everything,
@@ -145,6 +147,9 @@ public final class GraphCanvas<N, E> extends StackPane {
     private Function<E, ContextMenu> edgeMenu = e -> null;
     private Consumer<Map<String, Pt>> onMoved = moved -> {};
     private boolean showDashed = true;
+    private boolean focusLinks;
+    /** The card under the pointer, or null: in focus, its links are lit over the selection's. */
+    private String hovered;
     /** The corners cards were moved to, over what {@code arrange} placed. */
     private Map<String, Pt> pins = Map.of();
 
@@ -298,6 +303,17 @@ public final class GraphCanvas<N, E> extends StackPane {
         draw();
     }
 
+    /**
+     * Whether links are drawn in focus: at rest the solid ones full and the dashed ones faint, without their labels;
+     * a card under the pointer, or else the selected cards, light every link in and out of them and dim the rest.
+     * Off by default: every link full. Changing it, or the focus, routes nothing again.
+     */
+    public void setFocusLinks(boolean focus) {
+        if (focusLinks == focus) return;
+        focusLinks = focus;
+        light();
+    }
+
     /** Called with an item when its card is double-clicked. */
     public void setOnOpen(Consumer<N> onOpen) {
         this.onOpen = onOpen;
@@ -389,6 +405,8 @@ public final class GraphCanvas<N, E> extends StackPane {
         Set<String> before = new HashSet<>(cellOf.keySet());
         boolean hadCards = !before.isEmpty();
         N keep = selection.property().get();
+        // The cell under the pointer goes without an exit: the new one is entered on the pointer's next move.
+        hovered = null;
         byId.clear();
         cellOf.clear();
         cells.getChildren().clear();
@@ -559,8 +577,29 @@ public final class GraphCanvas<N, E> extends StackPane {
         // Drawn once and moved as a picture while the view pans: a card of pictures and effects is slow to draw.
         cell.setCache(true);
         cell.setCacheHint(cacheHint);
-        gestures.wire(cell, id.apply(node), node);
+        String key = id.apply(node);
+        gestures.wire(cell, key, node);
+        cell.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> hover(key));
+        cell.addEventHandler(MouseEvent.MOUSE_EXITED, e -> {
+            if (key.equals(hovered)) hover(null);
+        });
         return cell;
+    }
+
+    private void hover(String key) {
+        hovered = key;
+        if (focusLinks) light();
+    }
+
+    /** Lights the links {@link #setFocusLinks} says, as the pointer and the selection stand now. */
+    private void light() {
+        if (!focusLinks) {
+            links.light(a -> true);
+            return;
+        }
+        Set<String> focused = hovered != null && byId.containsKey(hovered) ? Set.of(hovered) : selection.ids();
+        links.light(focused.isEmpty() ? a -> !a.dashed()
+                : a -> focused.contains(a.from()) || focused.contains(a.to()));
     }
 
     private static void fadeIn(Node cell) {
@@ -573,6 +612,7 @@ public final class GraphCanvas<N, E> extends StackPane {
     private void markSelected() {
         cellOf.forEach((k, cell) -> cell.pseudoClassStateChanged(SELECTED, selection.contains(k)));
         minimap.draw(placed, selection::contains);
+        if (focusLinks) light();
     }
 
     // --- menus ---

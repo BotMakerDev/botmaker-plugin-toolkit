@@ -6,6 +6,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.Routes.Line;
 import com.botmaker.plugin.toolkit.graph.Routes.Route;
 import javafx.scene.Node;
+import javafx.scene.layout.Region;
 import javafx.scene.shape.LineTo;
 import javafx.scene.shape.MoveTo;
 import javafx.scene.shape.Path;
@@ -15,7 +16,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A drag's frame moves the links already drawn, touching only those whose route changed. */
 class LinkLayerTest {
@@ -44,5 +47,33 @@ class LinkLayerTest {
 
         layer.move(List.of(route("A", "B", 0, 0, 100, 0)), arrows.subList(0, 1), edges.subList(0, 1), 10, 10);
         assertEquals(3, layer.links().getChildren().size(), "other links than were drawn: drawn afresh");
+    }
+
+    @Test
+    void aLinkNotLitIsFaintWithoutItsLabelUnderTheLitAndADrawKeepsTheLight() {
+        LinkLayer<String> layer = new LinkLayer<>();
+        Region chip = new Region();
+        List<Arrow> arrows = List.of(Arrow.solid("A", "B"), Arrow.dashed("B", "C").withLabel(chip));
+        List<Route> routes = List.of(route("A", "B", 0, 0, 100, 0), route("B", "C", 100, 0, 200, 0));
+        List<String> edges = List.of("ab", "bc");
+        layer.draw(routes, arrows, edges, 0, 0);
+        Path ab = (Path) layer.links().getChildren().get(1);
+        Path bc = (Path) layer.links().getChildren().get(4);
+
+        layer.light(a -> !a.dashed());
+        assertEquals(1, ab.getOpacity());
+        assertEquals(LinkLayer.FAINT, bc.getOpacity());
+        assertFalse(chip.isVisible(), "a faint link's label is hidden");
+        assertTrue(layer.links().getChildren().indexOf(ab) > layer.links().getChildren().indexOf(bc),
+                "a lit link is drawn over a faint one");
+
+        layer.light(a -> a.to().equals("C"));
+        assertEquals(LinkLayer.FAINT, ab.getOpacity());
+        assertEquals(1, bc.getOpacity());
+        assertTrue(chip.isVisible());
+
+        layer.draw(routes, arrows, edges, 0, 0);
+        Path abAgain = (Path) layer.links().getChildren().get(1);
+        assertEquals(LinkLayer.FAINT, abAgain.getOpacity(), "drawn again, as lit as before");
     }
 }
