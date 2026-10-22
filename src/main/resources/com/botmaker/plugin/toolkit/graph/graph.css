@@ -12,20 +12,19 @@
     -bm-graph-selected: -bm-primary;
     -bm-graph-match: -bm-accent;
     -bm-graph-minimap: derive(-fx-control-inner-background, -6%);
+    -fx-background-color: -bm-graph-background;
 }
 
-.graph-canvas-content {
-    -fx-background-color: -bm-graph-background;
+/* Clear, so the dot grid behind the scroller shows through: the canvas itself is painted. */
+.graph-canvas-content,
+.graph-scroller,
+.graph-scroller > .viewport {
+    -fx-background-color: transparent;
 }
 
 /* Nothing is drawn with this rule: the grid is a pattern tile, which takes a colour, so the canvas reads it here. */
 .graph-grid-ink {
     -fx-background-color: -bm-graph-grid;
-}
-
-.graph-scroller,
-.graph-scroller > .viewport {
-    -fx-background-color: -bm-graph-background;
 }
 
 .graph-link {

@@ -4,8 +4,8 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
-import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
@@ -40,6 +40,7 @@ final class Viewport {
     /** A wheel's notch, in scroll pixels: a touchpad's many small scrolls add up to a step, not a step each. */
     private static final double NOTCH = 40;
     private static final Duration ZOOM_TIME = Duration.millis(250);
+    private static final Duration WHEEL_REST = Duration.millis(200);
 
     private final Pane content;
     private final Scale zoom = new Scale(1, 1);
@@ -50,6 +51,12 @@ final class Viewport {
     private Timeline zooming;
     /** Told once the zoom changed and the scroller is laid out again: what the minimap redraws its view on. */
     private Runnable zoomed = () -> {};
+    /** Told when the view starts or stops moving under a gesture: a pan, the wheel's zoom, {@link #zoomTo}'s. */
+    private Consumer<Boolean> moving = is -> {};
+    private boolean wasMoving;
+    /** Whether the wheel zooms now: until it has rested a moment, as a run of notches is one gesture. */
+    private boolean wheeling;
+    private final PauseTransition wheelRest = new PauseTransition(WHEEL_REST);
 
     private boolean panMoved;
     private double panX;
@@ -73,10 +80,13 @@ final class Viewport {
         // the top-left corner, the rest of the window empty).
         holder = new StackPane(sized);
         scroller = new ScrollPane(holder);
-        holder.minWidthProperty().bind(Bindings.createDoubleBinding(() -> scroller.getViewportBounds().getWidth(),
-                scroller.viewportBoundsProperty()));
-        holder.minHeightProperty().bind(Bindings.createDoubleBinding(() -> scroller.getViewportBounds().getHeight(),
-                scroller.viewportBoundsProperty()));
+        // Set on a resize only: the bounds change on every scroll too, and a bound size laid the scroller out again
+        // each time (2026-10-22, a pan's lag).
+        scroller.viewportBoundsProperty().addListener((o, was, is) -> {
+            if (was.getWidth() != is.getWidth() || was.getHeight() != is.getHeight()) {
+                holder.setMinSize(is.getWidth(), is.getHeight());
+            }
+        });
         // Not pannable: ScrollPane pans on any button, which would steal a card's click. A right or middle drag
         // pans instead, below.
         scroller.setPannable(false);
@@ -104,6 +114,18 @@ final class Viewport {
         this.zoomed = zoomed;
     }
 
+    /** Called with true when a pan or zoom gesture starts moving the view, with false once it is done. */
+    void onMoving(Consumer<Boolean> moving) {
+        this.moving = moving;
+    }
+
+    private void movingChanged() {
+        boolean now = panMoved && panning || wheeling || zooming != null;
+        if (now == wasMoving) return;
+        wasMoving = now;
+        moving.accept(now);
+    }
+
     /**
      * The wheel zooms, Ctrl or not, and a right or middle drag pans (the user's call, 2026-10-15); Shift+wheel and a
      * sideways swipe still scroll. A right click that did not drag goes to {@code rightClick}.
@@ -112,8 +134,15 @@ final class Viewport {
         scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (e.isShiftDown() || e.getDeltaY() == 0 || Math.abs(e.getDeltaX()) > Math.abs(e.getDeltaY())
                     || onScrollBar(e)) return;
+            wheeling = true;
+            wheelRest.playFromStart();
             zoomAbout(e.getX(), e.getY(), Math.pow(ZOOM_STEP, e.getDeltaY() / NOTCH));
+            movingChanged();
             e.consume();
+        });
+        wheelRest.setOnFinished(e -> {
+            wheeling = false;
+            movingChanged();
         });
         scroller.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
             if (e.getButton() != MouseButton.SECONDARY && e.getButton() != MouseButton.MIDDLE) return;
@@ -127,7 +156,10 @@ final class Viewport {
         });
         scroller.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
             if (!panning) return;
-            if (Math.hypot(e.getX() - panX, e.getY() - panY) > GraphCanvas.CLICK_SLOP) panMoved = true;
+            if (!panMoved && Math.hypot(e.getX() - panX, e.getY() - panY) > GraphCanvas.CLICK_SLOP) {
+                panMoved = true;
+                movingChanged();
+            }
             Bounds view = scroller.getViewportBounds();
             double spareW = content.getPrefWidth() * zoom.getX() - view.getWidth();
             double spareH = content.getPrefHeight() * zoom.getY() - view.getHeight();
@@ -138,6 +170,7 @@ final class Viewport {
         scroller.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
             if (!panning) return;
             panning = false;
+            movingChanged();
             e.consume();
             if (!panMoved && e.getButton() == MouseButton.SECONDARY) rightClick.accept(e);
         });
@@ -233,7 +266,8 @@ final class Viewport {
 
     /** Zooms to {@code scale} with graph point {@code to} in the middle of the view, eased over a quarter second. */
     void zoomTo(Pt to, double scale) {
-        stopZooming();
+        // Stopped without saying so: the view moves on, under the zoom that replaces it.
+        if (zooming != null) zooming.stop();
         Bounds view = scroller.getViewportBounds();
         Pt from = viewToContent(view.getWidth() / 2, view.getHeight() / 2);
         double was = zoom.getX();
@@ -248,12 +282,15 @@ final class Viewport {
                     shown.getWidth() / 2, shown.getHeight() / 2);
         });
         zooming = new Timeline(new KeyFrame(ZOOM_TIME, new KeyValue(done, 1, Interpolator.EASE_BOTH)));
+        zooming.setOnFinished(e -> stopZooming());
         zooming.play();
+        movingChanged();
     }
 
     /** Stops {@link #zoomTo}'s easing where it is: a zoom or Fit of the user's own wins over it. */
     private void stopZooming() {
         if (zooming != null) zooming.stop();
         zooming = null;
+        movingChanged();
     }
 }

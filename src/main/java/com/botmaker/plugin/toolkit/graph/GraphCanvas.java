@@ -16,6 +16,7 @@ import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
+import javafx.scene.CacheHint;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -167,6 +168,8 @@ public final class GraphCanvas<N, E> extends StackPane {
     private Placement arranged = new Placement(Map.of(), Set.of(), 0);
     /** {@link #arranged} with the pins: where the cards are drawn. */
     private Placement placement = arranged;
+    /** How the cards' pictures are scaled: {@link CacheHint#SPEED} while the view moves. */
+    private CacheHint cacheHint = CacheHint.QUALITY;
     /** How far the last draw moved the layout's corners onto the canvas: its margin, past the leftmost card. */
     private double shiftX = MARGIN;
     private double shiftY = MARGIN;
@@ -222,7 +225,13 @@ public final class GraphCanvas<N, E> extends StackPane {
         });
         minimap = new Minimap(content, viewport);
         search = new GraphSearch<>(this, id);
-        content.getChildren().addAll(grid.dots(), grid.ink(), links.links(), cells, links.labels(), gestures.band());
+        content.getChildren().addAll(grid.ink(), links.links(), cells, links.labels(), gestures.band());
+        // The grid moves with the content: a scroll, a zoom, a resize or a graph sized again.
+        viewport.scroller().viewportBoundsProperty().addListener((o, was, is) -> followGrid());
+        viewport.scroller().hvalueProperty().addListener((o, was, is) -> followGrid());
+        viewport.scroller().vvalueProperty().addListener((o, was, is) -> followGrid());
+        viewport.zoomProperty().addListener((o, was, is) -> followGrid());
+        viewport.onMoving(this::moving);
 
         viewport.scroller().addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.getCode() != KeyCode.ESCAPE || selection.isEmpty()) return;
@@ -246,7 +255,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         });
         viewport.scroller().skinProperty().addListener((o, was, is) -> relayout(false));
 
-        getChildren().addAll(viewport.scroller(), minimap.node());
+        getChildren().addAll(grid.dots(), viewport.scroller(), minimap.node());
     }
 
     // --- what is shown ---
@@ -437,21 +446,42 @@ public final class GraphCanvas<N, E> extends StackPane {
         double height = extent == null ? 2 * MARGIN : extent.height() + 2 * MARGIN;
         content.setPrefSize(width, height);
         content.setMinSize(width, height);
-        grid.resize(width, height);
         grid.paint();
+        followGrid();
 
         placeCells(placement);
         links.draw(routes, drawn, drawnEdges, shiftX, shiftY);
         minimap.draw(placed, selection::contains);
     }
 
-    /** A drag's frame: the cards and their links where {@code at} puts them, on the canvas as the last draw sized it. */
+    /**
+     * A drag's frame: the cards and their links where {@code at} puts them, on the canvas as the last draw sized it.
+     * Every link is routed again, which is arithmetic, but only the paths whose route changed are touched: a frame
+     * that built every link's nodes again lagged behind the pointer (2026-10-22).
+     */
     private void drawDragged(Placement at) {
         List<Arrow> drawn = new ArrayList<>();
         List<E> drawnEdges = new ArrayList<>();
         List<Route> routes = routesOf(at, drawn, drawnEdges);
         placeCells(at);
-        links.draw(routes, drawn, drawnEdges, shiftX, shiftY);
+        links.move(routes, drawn, drawnEdges, shiftX, shiftY);
+    }
+
+    /** Lines the grid behind the scroller up with the content as it is scrolled and zoomed now. */
+    private void followGrid() {
+        double z = viewport.zoom();
+        Pt corner = viewport.viewToContent(0, 0);
+        grid.follow(-corner.x() * z, -corner.y() * z, z);
+    }
+
+    /**
+     * While the view pans or zooms, the cards and labels are scaled as the pictures last drawn of them, and drawn
+     * sharp again once it rests: a card of pictures drawn afresh at each step of a zoom made the zoom stutter.
+     */
+    private void moving(boolean is) {
+        cacheHint = is ? CacheHint.SPEED : CacheHint.QUALITY;
+        cellOf.values().forEach(cell -> cell.setCacheHint(cacheHint));
+        links.setCacheHint(cacheHint);
     }
 
     /** Pins the cards a drag {@code moved}, draws them there and tells the plugin. */
@@ -508,6 +538,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         cell.setManaged(false);
         // Drawn once and moved as a picture while the view pans: a card of pictures and effects is slow to draw.
         cell.setCache(true);
+        cell.setCacheHint(cacheHint);
         gestures.wire(cell, id.apply(node), node);
         return cell;
     }
@@ -654,7 +685,7 @@ public final class GraphCanvas<N, E> extends StackPane {
     }
 
     private Paint background() {
-        Background background = content.getBackground();
+        Background background = getBackground();
         if (background == null || background.getFills().isEmpty()) return Color.WHITE;
         return background.getFills().getFirst().getFill();
     }

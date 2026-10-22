@@ -17,6 +17,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   now lays out and draws the cards, and package-private parts hold the rest: `Viewport` (zoom and pan),
   `Selection`, `CardGestures` (click, drag, box), `LinkLayer`, `DotGrid`, `Minimap` and `GraphSearch`.
 
+### Fixed
+
+- **`GraphCanvas` pans, zooms and drags smoothly**:
+  - The dot grid is one region the size of the view, behind the scroller, its pattern moved with the content. It
+    was the size of the graph, scaled with it, and painted again on every draw. Its dots stay one pixel at any
+    zoom, and zoomed far out every other dot goes.
+  - The canvas paints its own background; the content, the scroller and its viewport are clear. A PNG export is
+    on that background, without the grid.
+  - The view's size is set on a resize only: a binding laid the scroller out again on every scroll.
+  - While a pan, the wheel's zoom or a search's zoom moves the view, cards and link labels are scaled as the
+    pictures last drawn (`CacheHint.SPEED`), and drawn sharp again once it rests. Labels are drawn once and kept
+    as a picture.
+  - A drag's frame changes, in place, only the links whose route changed; it built every link's nodes again.
+  - A link's wide click line is never painted (opacity 0, still clicked); its transparent stroke was drawn on
+    every frame.
+
 ## [0.9.0] — 2026-10-18
 
 ### Added
