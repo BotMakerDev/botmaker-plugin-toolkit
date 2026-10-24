@@ -5,6 +5,60 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.10.0; re-released for updated upstream pins.
+
+### Changed
+
+- **`ManagedHandle.of` takes a `ManagedMethod`, and `ManagedSet.of` a `ManagedOpenSet`** (breaking, with contract
+  0.11.0's sealed `ManagedValue`). Handing either the wrong shape no longer compiles; it threw before. Type the
+  plugin's field by what its steps return (`ManagedMethod<Flow> RUN = ManagedValue.method(…)…`).
+  `ManagedSet.byGroup` answers empty for any set but `ofEnumGroups`.
+- **`graph.GraphCanvas` is split into parts**, with its public API and behaviour unchanged. The 1343-line class
+  now lays out and draws the cards, and package-private parts hold the rest: `Viewport` (zoom and pan),
+  `Selection`, `CardGestures` (click, drag, box), `LinkLayer`, `DotGrid`, `Minimap` and `GraphSearch`.
+- **`GraphCanvas.setFocusLinks` draws links in focus**: at rest the solid links are full and the dashed ones faint
+  (15%), their labels hidden. The card under the pointer, or else the selected cards, light every link in and out of
+  them, labels included, over the rest, which go faint. Off by default. A change of focus routes nothing again: it
+  sets opacity, visibility and order only.
+- **Links back can run back through the ranks** (`GraphLayout.Loops`):
+  - `LayeredLayout.arrange(…, Loops.THROUGH)` gives each link back a lane slot in every rank between its ends and
+    counts it when it orders each rank. Which links run back is decided by a walk that takes them in the order
+    listed.
+  - `Routes.Rules.with(Loops.THROUGH)` draws such a link out of its card's near side and back through a free gap in
+    each rank, into the far side of the card it returns to. Its corners are square and rounded, and each turn in a
+    channel is a step from the last.
+  - A link within one rank, or onto its own card, hooks round beside it. A link from a named port still goes around.
+  - `GraphCanvas.setRules` routes with them. `Loops.AROUND`, the old way, stays the default, so the flow editor is
+    unchanged.
+- **A layout can hand the canvas its links' paths** (`GraphLayout.Placement.paths`):
+  - A plugin that lays out with a library of its own (the SDK's screen map, by ELK) gives each link's path, one
+    for each edge that runs between the same two cards, in the order the edges are given.
+  - The canvas draws a given path with its corners rounded, and routes the links that have none.
+  - A card moved, by a drag or a pin, drops the paths of its links, and those are routed.
+  - `Routes.of` takes the paths one for one with the links. The three-part `Placement` constructor stays.
+
+### Removed
+
+- **`graph.TreeLayout`** (breaking): the screen map, its one caller, is laid out by ELK in the SDK now.
+
+### Fixed
+
+- **`GraphCanvas` pans, zooms and drags smoothly**:
+  - The dot grid is one region the size of the view, behind the scroller, its pattern moved with the content. It
+    was the size of the graph, scaled with it, and painted again on every draw. Its dots stay one pixel at any
+    zoom, and zoomed far out every other dot goes.
+  - The canvas paints its own background; the content, the scroller and its viewport are clear. A PNG export is
+    on that background, without the grid.
+  - The view's size is set on a resize only: a binding laid the scroller out again on every scroll.
+  - While a pan, the wheel's zoom or a search's zoom moves the view, cards and link labels are scaled as the
+    pictures last drawn (`CacheHint.SPEED`), and drawn sharp again once it rests. Labels are drawn once and kept
+    as a picture.
+  - A drag's frame changes, in place, only the links whose route changed; it built every link's nodes again.
+  - A link's wide click line is never painted (opacity 0, still clicked); its transparent stroke was drawn on
+    every frame.
+
 ## [0.10.0] — 2026-10-23
 
 ### Changed
