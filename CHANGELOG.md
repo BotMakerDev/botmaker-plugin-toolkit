@@ -5,6 +5,17 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`testing.PluginTests`**: a plugin's own `mvn verify` makes the checks a host makes at load.
+  `assertDeclared(MyPlugin.class)` reads `pom.xml` (`botmaker.plugin` names the class, `<name>` is set), checks the
+  class is `public final`, a direct `DeclaredPlugin` with a public constructor taking no arguments, constructs it,
+  and builds and asks every holder it names; every finding is listed in one `AssertionError`.
+  `assertListsEveryField(MyTypes.class)` fails a `public static final` declaration its holder's method does not
+  list, which a host would never see. Needs the contract's holder interfaces (0.13.0); no JUnit dependency.
+
 ## [0.11.0] — 2026-10-25
 
 No source changes since v0.10.0; re-released for updated upstream pins.
