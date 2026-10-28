@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.DeclaredPlugin;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.TypeHolder;
-import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCallType;
@@ -150,7 +149,7 @@ class PluginTestsTest {
     }
 
     private static ToolbarItem item(String id) {
-        return ToolbarItem.id(id).label(id).tooltip(id).in(ToolbarGroup.TOOLS, 0).onPress(() -> context -> {});
+        return ToolbarItem.id(id).label(id).tooltip(id).onBar(0).onPress(() -> context -> {});
     }
 
     private Path pom(String plugin, String name) throws IOException {
