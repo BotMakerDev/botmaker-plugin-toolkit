@@ -89,7 +89,7 @@ a plugin under rule 4 below, and a second plugin is who they are for).
   `Modals.tuple` (`tuplePill`'s), `Modals.program` (`Editors.program`'s), `Thumbnail.of`, and `ZoomPan`'s
   zoom limits.
 - **Kept with no plugin caller**: `ManagedHandle.value()` (the accessor of what the handle holds) and
-  `TestContexts.Recording.withType`/`withBounds` — a test kit sets every part of the context an editor can
+  `TestContexts.Recording.withType` — a test kit sets every part of the context an editor can
   read, whether or not a test has asked yet.
 - **Lifted, because both plugins wrote them**: `Fields.stepped` (`Modals.tuple` and basics' number field,
   whose copies had drifted: one read Shift on the buttons and ignored the arrow keys, the other the reverse)

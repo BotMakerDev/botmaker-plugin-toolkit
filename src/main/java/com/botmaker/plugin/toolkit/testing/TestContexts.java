@@ -1,6 +1,5 @@
 package com.botmaker.plugin.toolkit.testing;
 
-import com.botmaker.plugin.api.slot.Bounds;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
@@ -165,7 +164,6 @@ public final class TestContexts {
         private final Map<Integer, Object> arguments = new HashMap<>();
         /** The constant of each open set, by its id, that the value is written as. */
         private final Map<String, PluginValues.Member> members = new HashMap<>();
-        private Bounds bounds = Bounds.NONE;
 
         private Recording(Class<?> type, String source, boolean isSlot, Executable call, int argIndex) {
             this.type = type;
@@ -228,17 +226,6 @@ public final class TestContexts {
          */
         public Recording withArgument(int index, Object value) {
             arguments.put(index, value);
-            return this;
-        }
-
-        /**
-         * What {@link ValueContext#bounds()} answers — a field's {@code @Param(min, max)}.
-         *
-         * <p>{@link #set(Object)} does <b>not</b> clamp here, though the host does: what a test asserts is what
-         * the editor itself decided, so an editor that ignores the range is caught rather than rescued.
-         */
-        public Recording withBounds(double min, double max) {
-            this.bounds = new Bounds(min, max);
             return this;
         }
 
@@ -327,11 +314,6 @@ public final class TestContexts {
         @Override
         public Optional<SlotContext> slot() {
             return isSlot ? Optional.of(this) : Optional.empty();
-        }
-
-        @Override
-        public Bounds bounds() {
-            return bounds;
         }
 
         @Override
