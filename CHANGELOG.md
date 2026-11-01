@@ -5,6 +5,15 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.13.0; re-released for updated upstream pins.
+
+### Removed
+
+- `TestContexts.Recording.withBounds` (2026-10-29): the contract's `ValueContext.bounds()` and `Bounds` are gone
+  with `@Param`'s value rules.
+
 ## [0.13.0] — 2026-11-01
 
 ### Removed
