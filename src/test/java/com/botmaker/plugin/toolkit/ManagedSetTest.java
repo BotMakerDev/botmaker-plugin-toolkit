@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManagedSetTest {
 
     private static final ManagedOpenSet<String> WORDS =
-            ManagedValue.openSet(TestValue.Id.WORDS).of(String.class).in("Words").because("Mine.");
+            ManagedValue.openSet(TestValue.Id.WORDS).of(String.class).in(TestValue.Holder.WORDS).because("Mine.");
 
     /** A project holding the open set {@code @TestValue(WORDS)}, each constant a String; records every call. */
     private static final class Project implements PluginValues {

@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManagedHandleTest {
 
     private static final ManagedMethod<String> GREETING =
-            ManagedValue.method(TestValue.Id.GREETING).in("Values").holds(String.class, "hello").because("Mine.");
+            ManagedValue.method(TestValue.Id.GREETING).in(TestValue.Holder.VALUES).holds(String.class, "hello").because("Mine.");
 
     /** A project holding one {@code @TestValue(GREETING)} String, created only when asked. */
     private static final class Project implements StudioServices, PluginValues {
