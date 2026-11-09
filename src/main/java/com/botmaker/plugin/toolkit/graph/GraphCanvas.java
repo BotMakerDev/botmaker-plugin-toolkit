@@ -23,6 +23,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
@@ -34,6 +35,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 import java.io.IOException;
@@ -126,6 +128,21 @@ public final class GraphCanvas<N, E> extends StackPane {
     /** One search hit: the item, and the term of it that matched, empty when its first (its name) did. */
     public record Hit<N>(N node, String matched) {}
 
+    /**
+     * A box drawn behind the cards of {@code ids}, around wherever they are, titled {@code label}: a group of items a
+     * layout kept together.
+     */
+    public record Frame(String label, List<String> ids) {
+
+        public Frame {
+            ids = List.copyOf(ids);
+        }
+    }
+
+    /** The room a frame leaves around its cards, and above them for its title. */
+    private static final double FRAME_PAD = 14;
+    private static final double FRAME_TITLE = 22;
+
     private static final String SHEET = Objects.requireNonNull(GraphCanvas.class.getResource("graph.css"))
             .toExternalForm();
     static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
@@ -155,6 +172,8 @@ public final class GraphCanvas<N, E> extends StackPane {
 
     private final Pane content = new Pane();
     private final Group cells = new Group();
+    private final Group frameLayer = new Group();
+    private List<Frame> frames = List.of();
     private final DotGrid grid = new DotGrid();
     private final LinkLayer<E> links = new LinkLayer<>();
     private final Viewport viewport;
@@ -235,7 +254,8 @@ public final class GraphCanvas<N, E> extends StackPane {
         });
         minimap = new Minimap(content, viewport);
         search = new GraphSearch<>(this, id);
-        content.getChildren().addAll(grid.ink(), links.links(), cells, links.labels(), gestures.band());
+        frameLayer.setMouseTransparent(true);
+        content.getChildren().addAll(grid.ink(), frameLayer, links.links(), cells, links.labels(), gestures.band());
         // The grid moves with the content: a scroll, a zoom, a resize or a graph sized again.
         viewport.scroller().viewportBoundsProperty().addListener((o, was, is) -> followGrid());
         viewport.scroller().hvalueProperty().addListener((o, was, is) -> followGrid());
@@ -301,6 +321,58 @@ public final class GraphCanvas<N, E> extends StackPane {
         if (showDashed == show) return;
         showDashed = show;
         draw();
+    }
+
+    /**
+     * The frames drawn behind the cards from the next draw on, each around the cards of its ids that are
+     * shown, following them as they are dragged. A frame with fewer than two of its cards shown is not drawn. None by
+     * default.
+     */
+    public void setFrames(List<Frame> frames) {
+        this.frames = List.copyOf(frames);
+    }
+
+    /** What {@link #setFrames} last set. */
+    public List<Frame> frames() {
+        return frames;
+    }
+
+    /**
+     * Each frame as a box and a title around its shown cards. A drag moves them on every frame of the mouse, so the
+     * nodes are made once per {@link #setFrames} and only moved after.
+     */
+    private void drawFrames() {
+        if (frameLayer.getChildren().size() != 2 * frames.size()) {
+            frameLayer.getChildren().clear();
+            for (Frame frame : frames) {
+                Rectangle edge = new Rectangle();
+                edge.getStyleClass().add("graph-frame");
+                Label title = new Label(frame.label());
+                title.getStyleClass().add("graph-frame-title");
+                frameLayer.getChildren().addAll(edge, title);
+            }
+        }
+        for (int i = 0; i < frames.size(); i++) {
+            Rectangle edge = (Rectangle) frameLayer.getChildren().get(2 * i);
+            Label title = (Label) frameLayer.getChildren().get(2 * i + 1);
+            title.setText(frames.get(i).label());
+            Box around = null;
+            int shown = 0;
+            for (String each : frames.get(i).ids()) {
+                Box box = placed.get(each);
+                if (box == null) continue;
+                around = box.union(around);
+                shown++;
+            }
+            edge.setVisible(shown >= 2);
+            title.setVisible(shown >= 2);
+            if (shown < 2) continue;
+            edge.setX(around.minX() - FRAME_PAD);
+            edge.setY(around.minY() - FRAME_PAD - FRAME_TITLE);
+            edge.setWidth(around.width() + 2 * FRAME_PAD);
+            edge.setHeight(around.height() + 2 * FRAME_PAD + FRAME_TITLE);
+            title.relocate(around.minX() - FRAME_PAD + 8, around.minY() - FRAME_PAD - FRAME_TITLE + 3);
+        }
     }
 
     /**
@@ -568,6 +640,7 @@ public final class GraphCanvas<N, E> extends StackPane {
             placed.put(card.id(), new Box(p.x() + shiftX, p.y() + shiftY, p.x() + shiftX + card.width(),
                     p.y() + shiftY + card.height()));
         }
+        drawFrames();
     }
 
     private StackPane cell(N node) {

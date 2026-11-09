@@ -5,6 +5,13 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- `GraphCanvas.Frame` and `setFrames` (2026-11-09): titled boxes drawn behind groups of cards, following them as
+  they are dragged; styled by `.graph-frame` and `.graph-frame-title`.
+
 ## [0.13.1] — 2026-11-01
 
 No source changes since v0.13.0; re-released for updated upstream pins.

@@ -52,6 +52,20 @@
     -fx-cursor: hand;
 }
 
+/* A group's box behind its cards (GraphCanvas.Frame), and its title in the box's top corner. */
+.graph-frame {
+    -fx-fill: derive(-bm-graph-background, -4%);
+    -fx-stroke: -bm-divider;
+    -fx-stroke-width: 1.2;
+    -fx-arc-width: 14;
+    -fx-arc-height: 14;
+}
+
+.graph-frame-title {
+    -fx-text-fill: -bm-muted;
+    -fx-font-weight: bold;
+}
+
 .graph-node:match {
     -fx-effect: dropshadow(gaussian, -bm-graph-match, 14, 0.45, 0, 0);
 }
