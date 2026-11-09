@@ -5,6 +5,10 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No consumer-visible changes since v0.14.0. The only commit is the release commit, and its diff touches only `pom.xml`, with 2 lines changed. I've left out all headings and bullets so that nothing unsupported goes into `## [Unreleased]`.
+
 ## [0.14.0] — 2026-11-10
 
 ### Added
