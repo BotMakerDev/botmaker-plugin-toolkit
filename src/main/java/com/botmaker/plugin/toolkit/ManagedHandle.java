@@ -105,7 +105,7 @@ public final class ManagedHandle<T> {
         return ctx.get().write(newValue);
     }
 
-    /** The id's constant as a sentence says it: {@code …SdkValue$Id.FLOW_LAYOUT} is {@code "flow layout"}. */
+    /** The id's constant as a sentence says it: {@code …SdkValue$Id.LAUNCH_TARGETS} is {@code "launch targets"}. */
     private String spoken() {
         String id = value.id();
         return id.substring(id.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT).replace('_', ' ');
