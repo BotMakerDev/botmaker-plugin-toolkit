@@ -7,6 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `GraphLayout.Placement.apart(cards, held, pinned, gap)`: the placement with no card on another. Cards settle
+  firmest first (just dropped, then pinned, then the rest), each one on a settled card moved to the nearest free
+  place beside one. `GraphCanvas` applies it after its pins, so a card a layout puts where a pinned one sits, or a
+  pinned card grown over its neighbour, is pushed off; a dropped card gives way last, and `setOnMoved` reports
+  each pinned card it pushed at its new corner, so the plugin keeps it there.
+
 ### Changed
 
 - Every file states its license and copyright by REUSE (`REUSE.toml`, `LICENSES/`), every Java source starts with

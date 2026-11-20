@@ -3,12 +3,15 @@
 
 package com.botmaker.plugin.toolkit.graph;
 
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Card;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Link;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,5 +65,62 @@ class PinnedTest {
     @Test
     void noPinsIsTheLayoutItself() {
         assertSame(LAID, LAID.pinned(Map.of()));
+    }
+
+    /** Five cards pinned in a row, nine a layout laid over them: none left on another, the pinned ones unmoved. */
+    @Test
+    void pinnedThenSeparatedLeavesNoOverlap() {
+        List<Card> cards = new ArrayList<>();
+        Map<String, Pt> laid = new LinkedHashMap<>();
+        Map<String, Pt> pins = new LinkedHashMap<>();
+        for (int i = 0; i < 5; i++) {
+            cards.add(Card.of("P" + i, 120, 80));
+            laid.put("P" + i, new Pt(0, 0));
+            pins.put("P" + i, new Pt(i * 160, 0));
+        }
+        for (int i = 0; i < 9; i++) {
+            cards.add(Card.of("F" + i, 100, 60));
+            laid.put("F" + i, new Pt((i % 5) * 150 + 10, (i / 5) * 40 + 10));
+        }
+
+        Placement apart = new Placement(laid, Set.of(), 0).pinned(pins).apart(cards, Set.of(), pins.keySet(), 20);
+
+        for (int i = 0; i < cards.size(); i++) {
+            for (int j = i + 1; j < cards.size(); j++) {
+                Card a = cards.get(i);
+                Card b = cards.get(j);
+                assertFalse(a.at(apart.at().get(a.id())).overlaps(b.at(apart.at().get(b.id()))), a.id() + " on " + b.id());
+            }
+        }
+        pins.forEach((id, p) -> assertEquals(p, apart.at().get(id), id + " pinned, so it stays"));
+    }
+
+    /** A pinned card grown 100 px taller pushes the pinned card under it down, and stays where it was pinned. */
+    @Test
+    void aGrownPinnedCardPushesItsNeighbour() {
+        List<Card> cards = List.of(Card.of("TOP", 120, 180), Card.of("UNDER", 120, 80));
+        Map<String, Pt> pins = Map.of("TOP", new Pt(0, 0), "UNDER", new Pt(0, 100));
+
+        Placement apart = new Placement(pins, Set.of(), 0).pinned(pins).apart(cards, Set.of(), pins.keySet(), 20);
+
+        assertEquals(new Pt(0, 0), apart.at().get("TOP"));
+        assertEquals(new Pt(0, 200), apart.at().get("UNDER"));
+    }
+
+    /** A card just dropped on a pinned one stays where it was dropped; the pinned one gives way. */
+    @Test
+    void aCardDroppedOnAnotherPushesIt() {
+        List<Card> cards = List.of(Card.of("A", 100, 60), Card.of("B", 100, 60));
+        Map<String, Pt> pins = Map.of("A", new Pt(0, 0), "B", new Pt(10, 10));
+
+        Placement apart = new Placement(pins, Set.of(), 0).pinned(pins).apart(cards, Set.of("B"), pins.keySet(), 20);
+
+        assertEquals(new Pt(10, 10), apart.at().get("B"));
+        assertFalse(cards.get(0).at(apart.at().get("A")).overlaps(cards.get(1).at(apart.at().get("B"))));
+    }
+
+    @Test
+    void cardsApartAlreadyAreTheLayoutItself() {
+        assertSame(LAID, LAID.apart(List.of(Card.of("A", 100, 60), Card.of("B", 100, 60)), Set.of(), Set.of(), 20));
     }
 }

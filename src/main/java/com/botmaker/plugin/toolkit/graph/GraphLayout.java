@@ -3,7 +3,9 @@
 
 package com.botmaker.plugin.toolkit.graph;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -188,6 +190,60 @@ public final class GraphLayout {
                 moved.put(id, p);
                 if (Math.abs(p.x() - was.x()) > 1 || Math.abs(p.y() - was.y()) > 1) shifted.add(id);
             });
+            return moved(moved, shifted);
+        }
+
+        /**
+         * This placement with no two of {@code cards} on each other: a layout never lays one card over another, but
+         * pins do (a card pinned before the cards beside it grew, a card a layout put where a pinned one already sat).
+         * The cards settle one by one, firmest first: {@code held} cards (just dropped), then {@code pinned} ones,
+         * then the rest, each kind by its corner, top to bottom then left to right. A card on one already settled
+         * moves to the nearest place beside a settled card, {@code gap} from it, that is on none: left, right, above
+         * or below, keeping its other axis. Every card finds one, as right of the rightmost is always free. A card
+         * moved loses its links' paths, as a pinned one does.
+         */
+        public Placement apart(List<Card> cards, Set<String> held, Set<String> pinned, double gap) {
+            Map<String, Pt> moved = new LinkedHashMap<>(at);
+            List<Card> order = cards.stream().filter(c -> moved.containsKey(c.id()))
+                    .sorted(Comparator.<Card>comparingInt(c -> -firmness(c.id(), held, pinned))
+                            .thenComparingDouble(c -> moved.get(c.id()).y())
+                            .thenComparingDouble(c -> moved.get(c.id()).x()))
+                    .toList();
+            List<Box> settled = new ArrayList<>();
+            Set<String> shifted = new HashSet<>();
+            for (Card card : order) {
+                Pt was = moved.get(card.id());
+                Box box = card.at(was);
+                if (settled.stream().anyMatch(box::overlaps)) {
+                    Pt best = null;
+                    for (Box s : settled) {
+                        for (Pt p : List.of(new Pt(s.minX() - gap - card.width(), was.y()),
+                                new Pt(s.maxX() + gap, was.y()), new Pt(was.x(), s.minY() - gap - card.height()),
+                                new Pt(was.x(), s.maxY() + gap))) {
+                            Box there = card.at(p);
+                            if (settled.stream().anyMatch(there::overlaps)) continue;
+                            if (best == null || distance(was, p) < distance(was, best)) best = p;
+                        }
+                    }
+                    moved.put(card.id(), best);
+                    shifted.add(card.id());
+                    box = card.at(best);
+                }
+                settled.add(box);
+            }
+            return shifted.isEmpty() ? this : moved(moved, shifted);
+        }
+
+        private static double distance(Pt a, Pt b) {
+            return Math.hypot(a.x() - b.x(), a.y() - b.y());
+        }
+
+        private static int firmness(String id, Set<String> held, Set<String> pinned) {
+            return held.contains(id) ? 2 : pinned.contains(id) ? 1 : 0;
+        }
+
+        /** This placement at {@code moved}, the links of the {@code shifted} cards losing their paths. */
+        private Placement moved(Map<String, Pt> moved, Set<String> shifted) {
             Map<Link, List<List<Pt>>> kept = new LinkedHashMap<>(paths);
             kept.keySet().removeIf(link -> shifted.contains(link.from()) || shifted.contains(link.to()));
             return new Placement(moved, hidden, crossings, kept);

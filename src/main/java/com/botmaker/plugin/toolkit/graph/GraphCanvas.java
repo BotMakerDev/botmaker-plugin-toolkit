@@ -154,6 +154,8 @@ public final class GraphCanvas<N, E> extends StackPane {
     private static final double MARGIN = 60;
     /** How far a press may move and still be a click (a menu, a pick) rather than a pan, a drag or a box. */
     static final double CLICK_SLOP = 4;
+    /** The space a card pushed off another keeps from it ({@link Placement#apart}). */
+    private static final double APART = 20;
 
     private final Function<N, String> id;
     private final Function<N, Node> view;
@@ -411,7 +413,8 @@ public final class GraphCanvas<N, E> extends StackPane {
 
     /**
      * Called, after a drag, with the corner each moved card was left at, in the coordinates {@code arrange} places
-     * in. The canvas pins them already; a plugin keeps them to hand back through {@link #setPinned}.
+     * in, and each pinned card the drop pushed off at its new corner. The canvas pins them already; a plugin keeps
+     * them to hand back through {@link #setPinned}.
      */
     public void setOnMoved(Consumer<Map<String, Pt>> onMoved) {
         this.onMoved = onMoved;
@@ -428,7 +431,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         });
         if (now.equals(this.pins)) return;
         this.pins = Map.copyOf(now);
-        placement = arranged.pinned(this.pins);
+        placement = laid(Set.of());
         draw();
     }
 
@@ -521,7 +524,7 @@ public final class GraphCanvas<N, E> extends StackPane {
         Map<String, Pt> stillShown = new LinkedHashMap<>(pins);
         stillShown.keySet().retainAll(byId.keySet());
         pins = Map.copyOf(stillShown);
-        placement = arranged.pinned(pins);
+        placement = laid(Set.of());
         draw();
 
         selection.keepShown(keep);
@@ -590,7 +593,20 @@ public final class GraphCanvas<N, E> extends StackPane {
         links.setCacheHint(cacheHint);
     }
 
-    /** Pins the cards a drag {@code moved}, draws them there and tells the plugin. */
+    /**
+     * What {@code arrange} placed, with the pins over it and no card left on another: a card the layout put where a
+     * pinned one sits, or a pinned one grown over its neighbour, is pushed off, the {@code held} cards (a drag's)
+     * moving last.
+     */
+    private Placement laid(Set<String> held) {
+        return arranged.pinned(pins).apart(cards, held, pins.keySet(), APART);
+    }
+
+    /**
+     * Pins the cards a drag {@code moved}, draws them there and tells the plugin, with each pinned card they pushed
+     * off at its new corner: kept so, the pushed card stays where it went instead of coming back under the dropped one
+     * on the next drag or when the map opens again.
+     */
     private void pin(Map<String, Pt> moved) {
         Map<String, Pt> nextPins = new LinkedHashMap<>(pins);
         nextPins.putAll(moved);
@@ -599,10 +615,19 @@ public final class GraphCanvas<N, E> extends StackPane {
         Pt corner = viewport.viewToContent(0, 0);
         double wasX = shiftX;
         double wasY = shiftY;
-        placement = arranged.pinned(pins);
+        placement = laid(moved.keySet());
+        Map<String, Pt> told = new LinkedHashMap<>(moved);
+        pins.forEach((id, p) -> {
+            Pt now = placement.at().get(id);
+            if (now != null && !now.equals(p)) told.put(id, now);
+        });
+        if (told.size() > moved.size()) {
+            nextPins.putAll(told);
+            pins = Map.copyOf(nextPins);
+        }
         draw();
         viewport.putCorner(new Pt(corner.x() + shiftX - wasX, corner.y() + shiftY - wasY));
-        onMoved.accept(Collections.unmodifiableMap(moved));
+        onMoved.accept(Collections.unmodifiableMap(told));
     }
 
     /**
