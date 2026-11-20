@@ -170,4 +170,4 @@ default rather than an exception.
 
 Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
 `groupId`/`version`. **The maintainer owns the publish** — releases are cut from the umbrella with
-`../release.sh --plugin-toolkit <version>`.
+`sluice --plugin-toolkit <version>`.
