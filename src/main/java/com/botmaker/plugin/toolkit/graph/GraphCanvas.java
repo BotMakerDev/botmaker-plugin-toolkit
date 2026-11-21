@@ -596,10 +596,10 @@ public final class GraphCanvas<N, E> extends StackPane {
     /**
      * What {@code arrange} placed, with the pins over it and no card left on another: a card the layout put where a
      * pinned one sits, or a pinned one grown over its neighbour, is pushed off, the {@code held} cards (a drag's)
-     * moving last.
+     * moving last. The cards no pin holds sit beside the pinned ones, not where the layout's own space put them.
      */
     private Placement laid(Set<String> held) {
-        return arranged.pinned(pins).apart(cards, held, pins.keySet(), APART);
+        return arranged.pinned(pins).beside(cards, pins.keySet(), APART).apart(cards, held, pins.keySet(), APART);
     }
 
     /**

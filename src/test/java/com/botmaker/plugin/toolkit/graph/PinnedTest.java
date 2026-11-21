@@ -119,6 +119,28 @@ class PinnedTest {
         assertFalse(cards.get(0).at(apart.at().get("A")).overlaps(cards.get(1).at(apart.at().get("B"))));
     }
 
+    /** Cards no pin holds come beside the pinned ones, tops level, keeping their places among themselves. */
+    @Test
+    void cardsNoPinHoldsComeBesideThePinnedOnes() {
+        List<Card> cards = List.of(Card.of("P", 100, 60), Card.of("Q", 100, 60), Card.of("N", 100, 60),
+                Card.of("M", 100, 60), Card.of("C", 100, 60));
+        Map<String, Pt> laid = Map.of("P", new Pt(0, 0), "Q", new Pt(0, 100), "N", new Pt(3000, 2000),
+                "M", new Pt(3200, 2100));
+        Placement beside = new Placement(laid, Set.of("C"), 0).beside(cards, Set.of("P", "Q", "C"), 20);
+
+        assertEquals(new Pt(0, 0), beside.at().get("P"));
+        assertEquals(new Pt(120, 0), beside.at().get("N"));
+        assertEquals(new Pt(320, 100), beside.at().get("M"));
+        assertFalse(beside.at().containsKey("C"));
+    }
+
+    @Test
+    void noPinOrEveryPinLeavesThePlacementAlone() {
+        List<Card> cards = List.of(Card.of("A", 100, 60), Card.of("B", 100, 60));
+        assertSame(LAID, LAID.beside(cards, Set.of(), 20));
+        assertSame(LAID, LAID.beside(cards, Set.of("A", "B"), 20));
+    }
+
     @Test
     void cardsApartAlreadyAreTheLayoutItself() {
         assertSame(LAID, LAID.apart(List.of(Card.of("A", 100, 60), Card.of("B", 100, 60)), Set.of(), Set.of(), 20));

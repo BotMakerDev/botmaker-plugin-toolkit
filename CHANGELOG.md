@@ -5,6 +5,14 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- A graph some of whose cards are pinned no longer draws the others far off in the layout's own space, their links
+  running across the whole canvas: the cards no pin holds sit together just right of the pinned ones, tops level
+  (`Placement.beside`, which `GraphCanvas` applies before pushing overlapping cards apart).
+
 ## [0.17.0] — 2026-11-21
 
 ### Added

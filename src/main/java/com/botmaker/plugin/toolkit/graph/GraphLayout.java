@@ -194,6 +194,30 @@ public final class GraphLayout {
         }
 
         /**
+         * This placement with the cards no pin holds moved, together, to just right of the {@code pinned} ones, their
+         * tops level: the layout placed them in its own space, which the pins left, so a card added after the map was
+         * pinned came out far off, its links running across the whole canvas (2026-11-21). They keep their places
+         * among themselves. Unchanged when no card or every card is pinned; a hidden card counts as neither.
+         */
+        public Placement beside(List<Card> cards, Set<String> pinned, double gap) {
+            List<Card> shown = cards.stream().filter(c -> at.containsKey(c.id()) && !hidden.contains(c.id())).toList();
+            Box held = extent(shown.stream().filter(c -> pinned.contains(c.id())).toList());
+            List<Card> free = shown.stream().filter(c -> !pinned.contains(c.id())).toList();
+            Box loose = extent(free);
+            if (held == null || loose == null) return this;
+            double dx = held.maxX() + gap - loose.minX();
+            double dy = held.minY() - loose.minY();
+            Map<String, Pt> moved = new LinkedHashMap<>(at);
+            Set<String> shifted = new HashSet<>();
+            for (Card card : free) {
+                Pt p = moved.get(card.id());
+                moved.put(card.id(), new Pt(p.x() + dx, p.y() + dy));
+                shifted.add(card.id());
+            }
+            return moved(moved, shifted);
+        }
+
+        /**
          * This placement with no two of {@code cards} on each other: a layout never lays one card over another, but
          * pins do (a card pinned before the cards beside it grew, a card a layout put where a pinned one already sat).
          * The cards settle one by one, firmest first: {@code held} cards (just dropped), then {@code pinned} ones,
