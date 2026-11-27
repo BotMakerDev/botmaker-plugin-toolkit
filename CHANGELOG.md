@@ -5,6 +5,12 @@ All notable changes to `botmaker-plugin-toolkit`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [0.18.0] — 2026-11-27
+
+### Changed
+
+- Built against botmaker-studio-api 0.21.0 (was 0.20.0).
+
 ## [0.17.2] — 2026-11-24
 
 ### Changed
